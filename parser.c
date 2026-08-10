@@ -179,20 +179,26 @@ Node *handleCodeBlock(Parser *p) //starts on opening {
     int statementCap = 8;
     Node **statements = malloc(sizeof(Node*) * statementCap);
     int statementCount = 0;
-    int scope = 0;
+    consume(p, TOKEN_PUNCTUATION, "{", "Expected opening { after function arguments!");
+    int scope = 1; //consume opening { and set scope to 1
     do
     {
         if (IS_OPEN_BRACE(p)) scope++;
         if (IS_CLOSE_BRACE(p)) scope--;
         if (scope == 0) break; //exit early if end of code block
         if (IS_CLOSE_BRACE(p)) continue; //do not process statement if empty
-        if (statementCount >= statementCap) { statementCap *= 2; statements = realloc(statements, sizeof(Node*) * statementCap); }
+        if (statementCount >= statementCap) 
+        {
+            statementCap *= 2;
+            statements = realloc(statements, sizeof(Node*) * statementCap); 
+        }
         statements[statementCount] = handleStatement(p);
         statementCount++;
         while (!IS_SEMICOLON(p) && !IS_CLOSE_BRACE(p))
         {
             skip(p, "Expected ; or } before end of file");
         }
+        if(IS_SEMICOLON(p)) consume(p, TOKEN_PUNCTUATION, ";", "Expected ; to terminate statement!");
     } while (scope != 0);
     consume(p, TOKEN_PUNCTUATION, "}", "Expected } at end of code block");
     block->block.statements = statements;

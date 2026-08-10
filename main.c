@@ -77,7 +77,7 @@ void printNode(Node *node, int depth)
             break;
 
         case NODE_FUNCTION_DECL:
-            printf("FunctionDecl: %s -> %s\n",
+            printf("FunctionDecl: %s returns %s\n",
                    node->functionDecl.name,
                    node->functionDecl.returnType);
             if (node->functionDecl.paramCount == 0)
@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
-    Token tok = nextToken(&lexer);
+    Token tok;
     while (1)
     {
         tok = nextToken(&lexer);
@@ -150,8 +150,9 @@ int main(int argc, char *argv[]) {
     }
     for (int i = 0; i < tokens; i++)
     {
-        printf("[%02d] type=%s text=%s", i, tokentypeToString(tokenArray[i].type), tokenArray[i].text);
+        printf("[%02d] type=%s text=%s\n", i, tokentypeToString(tokenArray[i].type), tokenArray[i].text);
     }
+    fflush(stdout);
 
     Parser parser = { .tokens = tokenArray, .tokenCount = tokens, .pos = 0 };
     Node *ast = parse(&parser);

@@ -1,0 +1,6 @@
+transpiler
+*.dSYM
+transpiler.dSYM
+.DS_STORE
+Thumbs.db
+

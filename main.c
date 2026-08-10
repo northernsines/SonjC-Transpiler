@@ -150,7 +150,7 @@ int main(int argc, char *argv[]) {
     }
     for (int i = 0; i < tokens; i++)
     {
-        printf("[%d] type=%d text=\"%s\"\n", i, tokenArray[i].type, tokenArray[i].text);
+        printf("[%0d] type=%s text=\"%s\"\n", i, tokentypeToString(tokenArray[i].type), tokenArray[i].text);
     }
 
     Parser parser = { .tokens = tokenArray, .tokenCount = tokens, .pos = 0 };

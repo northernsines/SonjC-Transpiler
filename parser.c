@@ -172,7 +172,7 @@ Node *handleStatement(Parser *p) //starts on whatever is after ; or }
 }
 
 Node *handleCodeBlock(Parser *p) //starts on opening {
-{
+{ 
     Node *block = malloc(sizeof(Node));
     block->type = NODE_BLOCK;
 

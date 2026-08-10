@@ -40,5 +40,6 @@ typedef struct {
 } Lexer;
 
 Token nextToken(Lexer *lexer); 
+char *tokentypeToString(TokenType type);
 
 #endif

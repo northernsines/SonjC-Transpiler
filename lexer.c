@@ -629,6 +629,6 @@ char *tokentypeToString(TokenType type)
         type == TOKEN_NUMBER ? "NUMR" :
         type == TOKEN_DIRECTIVE ? "DIRV":
         type == TOKEN_NONE ? "NONE":
-        type == TOKEN_EOF ? "EOF":
+        type == TOKEN_EOF ? "EOFL":
         type == TOKEN_CHAR ? "CHAR" : "UKWN";
 }

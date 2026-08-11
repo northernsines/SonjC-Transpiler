@@ -134,13 +134,13 @@ Node **handleArgList(Parser *p, bool decleration, int *outCount)
     return params;
 }
 
-Node *handleExpression(Parser *p)
+
+Node *handleExpression(Parser *p, int start, int end)
 {
     bool isCallExpression =
         IS_IDENTIFIER(p) &&
         p->tokens[p->pos + 1].type == TOKEN_PUNCTUATION &&
         !strcmp(p->tokens[p->pos + 1].text, "(");
-
     if (isCallExpression)
     {
         Node *callExpression = malloc(sizeof(Node));
@@ -152,13 +152,26 @@ Node *handleExpression(Parser *p)
         callExpression->callExpr.args = params;
         return callExpression;
     }
+    //and HERE is where i have to implement pratt parsing
+}
+
+Node *handleIfStatement(Parser *p)
+{
+    
 }
 
 Node *handleExpressionStatement(Parser *p)
 {
     Node *expressionStatement = malloc(sizeof(Node));
+    int startpos = p->pos; //cache starting position
+    while(!IS_SEMICOLON(p))
+    {
+        skip(p, "expected semicolon before end of file!");
+    }
+    int endpos = p->pos; //cache ending position
+    p->pos = startpos;
     expressionStatement->type = NODE_EXPR_STMT;
-    expressionStatement->exprStmt.expr = handleExpression(p);
+    expressionStatement->exprStmt.expr = handleExpression(p, startpos, endpos);
     return expressionStatement;
 }
 
@@ -166,8 +179,12 @@ Node *handleStatement(Parser *p) //starts on whatever is after ; or }
 {
     Node *statement;
     //logic for determining kind of statement will go here
-    //STUB, hardcoded to an expression statement
-    statement = handleExpressionStatement(p);
+    //STUB, not all statements implemented.
+    if(IS_KEYWORD(p, "if"))
+    {
+        statement = handleIfStatement(p);
+    }
+    else statement = handleExpressionStatement(p);
     return statement;
 }
 

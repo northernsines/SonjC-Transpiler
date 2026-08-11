@@ -1,6 +1,7 @@
 import io;
 
-main(int myArg)
+main()
 {
+    int x = 0;
     print("hello world");
 }

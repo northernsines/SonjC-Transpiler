@@ -107,20 +107,30 @@ typedef struct {
 } Parser;
 
 // current-token shorthand
-#define CUR(p) ((p)->tokens[(p)->pos])
+#define PREV(p)              ((p)->tokens[(p)->pos-1])
+#define CUR(p)               ((p)->tokens[(p)->pos])
+#define NEXT(p)              ((p)->tokens[(p)->pos+1])
 
 // common token-check macros
-#define IS_PUNCT(p, s)      (CUR(p).type == TOKEN_PUNCTUATION && !strcmp(CUR(p).text, (s)))
-#define IS_KEYWORD(p, s)    (CUR(p).type == TOKEN_KEYWORD && !strcmp(CUR(p).text, (s)))
-#define IS_IDENTIFIER(p)    (CUR(p).type == TOKEN_IDENTIFIER)
+#define IS_PUNCT(p, s)       (CUR(p).type == TOKEN_PUNCTUATION && !strcmp(CUR(p).text, (s)))
+#define IS_KEYWORD(p, s)     (CUR(p).type == TOKEN_KEYWORD && !strcmp(CUR(p).text, (s)))
+#define IS_IDENTIFIER(p)     (CUR(p).type == TOKEN_IDENTIFIER)
 
-#define IS_OPEN_PAREN(p)    IS_PUNCT(p, "(")
-#define IS_CLOSE_PAREN(p)   IS_PUNCT(p, ")")
-#define IS_OPEN_BRACE(p)    IS_PUNCT(p, "{")
-#define IS_CLOSE_BRACE(p)   IS_PUNCT(p, "}")
-#define IS_COMMA(p)         IS_PUNCT(p, ",")
-#define IS_SEMICOLON(p)     IS_PUNCT(p, ";")
-#define IS_VOID_KW(p)       IS_KEYWORD(p, "void")
+#define PREV_PUNCT(p, s)     (PREV(p).type == TOKEN_PUNCTUATION && !strcmp(CUR(p).text, (s)))
+#define PREV_KEYWORD(p, s)   (PREV(p).type == TOKEN_KEYWORD && !strcmp(CUR(p).text, (s)))
+#define PREV_IDENTIFIER(p)   (PREV(p).type == TOKEN_IDENTIFIER)
+
+#define NEXT_PUNCT(p, s)     (PREV(p).type == TOKEN_PUNCTUATION && !strcmp(CUR(p).text, (s)))
+#define NEXT_KEYWORD(p, s)   (PREV(p).type == TOKEN_KEYWORD && !strcmp(CUR(p).text, (s)))
+#define NEXT_IDENTIFIER(p)   (PREV(p).type == TOKEN_IDENTIFIER)
+
+#define IS_OPEN_PAREN(p)     IS_PUNCT(p, "(")
+#define IS_CLOSE_PAREN(p)    IS_PUNCT(p, ")")
+#define IS_OPEN_BRACE(p)     IS_PUNCT(p, "{")
+#define IS_CLOSE_BRACE(p)    IS_PUNCT(p, "}")
+#define IS_COMMA(p)          IS_PUNCT(p, ",")
+#define IS_SEMICOLON(p)      IS_PUNCT(p, ";")
+#define IS_VOID_KW(p)        IS_KEYWORD(p, "void")
 
 Token consume(Parser *p, TokenType expectedType, const char *expectedText, const char *context);
 void skip(Parser *p, const char *context);

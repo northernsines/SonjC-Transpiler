@@ -5,7 +5,7 @@
 /*
 SonjC Parser Header File
 Written Aug 2026
-Defines the various types of node on the Abstract Syntax Tree.
+Defines the various types of node on the Abstract Syntax Tree, as well as other data types and macros.
 */
 
 typedef enum { //define different kinds of nodes
@@ -15,8 +15,9 @@ typedef enum { //define different kinds of nodes
     NODE_BLOCK,
     NODE_EXPR_STMT,
     NODE_CALL_EXPR,
-    NODE_BINARY_EXPR,
     NODE_UNARY_EXPR,
+    NODE_BINARY_EXPR,
+    NODE_TERNARY_EXPR,
     NODE_VAR,
     NODE_LITERAL,
     NODE_IF_STMT,
@@ -32,6 +33,46 @@ typedef enum { //define different kinds of nodes
     NODE_LABEL_STMT,
     NODE_INSTANCE_DECL,
 } NodeType;
+
+typedef enum {
+    //comma
+    OPERATOR_COMMA,
+    //assignment
+    OPERATOR_ASSIGN,
+    //ternary
+    //logical AND and OR
+    OPERATOR_LOGICAL_OR,
+    OPERATOR_LOGICAL_AND,
+    //bitwise AND OR and XOR
+    OPERATOR_BITWISE_AND,
+    OPERATOR_BITWISE_OR,
+    OPERATOR_BITWISE_XOR,
+    //equality
+    OPERATOR_IS_EQUAL,
+    OPERATOR_IS_NOT_EQUAL,
+    //relational
+    //shift
+    //additive
+    OPERATOR_ADD,
+    OPERATOR_SUBTRACT,
+    //multiplicative
+    OPERATOR_MULTIPLY,
+    OPERATOR_DIVIDE,
+    //cast
+    OPERATOR_CAST,
+    //unary
+    OPERATOR_LOGICAL_NOT,
+    //postfix
+    OPERATOR_POSTFIX_INCREMENT,
+    OPERATOR_POSTFIX_DECREMENT
+} OperatorType; //grouped by lbp
+
+typedef struct {
+    OperatorType type;
+    int lbp;
+    Node* (*nud)(Parser* p);
+    Node* (*led)(Parser* p, Node* left);
+} PrattOperator;
 
 typedef struct Node {
     NodeType type;   // which kind of node 
@@ -92,9 +133,27 @@ typedef struct Node {
             char *name;
         } var;
 
-        struct { //variable reference
+        struct { //value literal
             char *value;
         }literal;
+
+        struct { //unary expression
+            PrattOperator *operator;
+            Node *exp;
+        }binaryExpr;
+
+        struct { //binary expression
+            PrattOperator *operator;
+            Node *leftExp;
+            Node *rightExp;
+        }binaryExpr;
+
+        struct { //ternary expression
+            PrattOperator *operator;
+            Node *conditionExp;
+            Node *ifTrueExp;
+            Node *ifFalseExp;
+        }binaryExpr;
 
         // ... one struct per NodeType (STUB currently)
     };
@@ -132,8 +191,12 @@ typedef struct {
 #define IS_SEMICOLON(p)      IS_PUNCT(p, ";")
 #define IS_VOID_KW(p)        IS_KEYWORD(p, "void")
 
+
+//neccessary function declerations
 Token consume(Parser *p, TokenType expectedType, const char *expectedText, const char *context);
 void skip(Parser *p, const char *context);
 Node *parse(Parser *p);
 
+//operator rule table
+PrattOperator rules[17];
 #endif

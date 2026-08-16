@@ -6,6 +6,12 @@
 Token *tokenArray;
 size_t tokens;
 
+/*
+SonjC Main Entry Point
+Written Aug 2026
+Handles the runtime and execution of each step of compilation.
+*/
+
 
 char *read_file(const char *path) {
     FILE *f = fopen(path, "rb");

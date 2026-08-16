@@ -25,6 +25,19 @@ void parserError(const char *message, ...)
     va_end(args);
 }
 
+bool isTypeName(Token *t)
+{ //STUB, expand with all type names in lang
+    if(t->type != TOKEN_KEYWORD) return false;
+    bool returnBool =
+    !strcmp(t->text, "int") ||
+    !strcmp(t->text, "float") ||
+    !strcmp(t->text, "char") ||
+    !strcmp(t->text, "bool") ||
+    !strcmp(t->text, "string") ||
+    !strcmp(t->text, "size_t");
+    return returnBool;
+}
+
 static const char *tokenTypeName(TokenType t)
 {
     switch (t)
@@ -134,25 +147,30 @@ Node **handleArgList(Parser *p, bool decleration, int *outCount)
     return params;
 }
 
+Node* nudUnaryPlus(Parser *p)
+{
 
+}
+
+Node* nudPrimary(Parser *p)
+{
+
+}
+
+Node* ledBinary(Parser *p, Node *left)
+{
+
+}
+
+void initRules(void)
+{
+    rules[OPERATOR_LOGICAL_AND] = (PrattOperator){ OPERATOR_LOGICAL_AND, 50, true, NULL, ledBinary};
+    rules[OPERATOR_ADD]      = (PrattOperator){ OPERATOR_ADD, 120, true, nudUnaryPlus, ledBinary };
+    rules[OPERATOR_MULTIPLY] = (PrattOperator){ OPERATOR_MULTIPLY, 130, true, NULL, ledBinary };
+}
 Node *handleExpression(Parser *p, int start, int end)
 {
-    bool isCallExpression =
-        IS_IDENTIFIER(p) &&
-        p->tokens[p->pos + 1].type == TOKEN_PUNCTUATION &&
-        !strcmp(p->tokens[p->pos + 1].text, "(");
-    if (isCallExpression)
-    {
-        Node *callExpression = malloc(sizeof(Node));
-        callExpression->type = NODE_CALL_EXPR;
-        callExpression->callExpr.name = CUR(p).text;
-        int paramCount = 0;
-        Node **params = handleArgList(p, false, &paramCount);
-        callExpression->callExpr.argCount = paramCount;
-        callExpression->callExpr.args = params;
-        return callExpression;
-    }
-    //and HERE is where i have to implement pratt parsing
+    
 }
 
 Node *handleIfStatement(Parser *p)

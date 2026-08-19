@@ -62,7 +62,14 @@ void printNode(Node *node, int depth)
             break;
 
         case NODE_VAR_DECL:
-            printf("VarDecl: %s = %s\n", node->varDecl.name, node->varDecl.value);
+            printf("VarDecl: %s\n", node->varDecl.name);
+            printNode(node->varDecl.value, depth + 1);
+            break;
+
+        case NODE_BINARY_EXPR:
+            printf("binaryExp: %d\n", node->binaryExpr.operator->operator.lbp);
+            printNode(node->binaryExpr.leftExp, depth + 1);
+            printNode(node->binaryExpr.rightExp, depth + 1);
             break;
 
         case NODE_CALL_EXPR:
@@ -156,10 +163,11 @@ int main(int argc, char *argv[]) {
     }
     for (int i = 0; i < tokens; i++)
     {
-        printf("[%02d] type=%s text=%s\n", i, tokentypeToString(tokenArray[i].type), tokenArray[i].text);
+        printf("[%02d] type=%s text: %s\n", i, tokentypeToString(tokenArray[i].type), tokenArray[i].text);
     }
     fflush(stdout);
 
+    initRules();
     Parser parser = { .tokens = tokenArray, .tokenCount = tokens, .pos = 0 };
     Node *ast = parse(&parser);
     printNode(ast, 0);

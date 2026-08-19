@@ -10,6 +10,8 @@ Written Aug 2026
 Parses tokens emitted by the lexer into an Abstract Syntax Tree.
 */
 
+Node *parseExpression(Parser*, int);
+
 void vparserError(const char *message, va_list args)
 {
     vfprintf(stderr, message, args);
@@ -36,6 +38,12 @@ bool isTypeName(Token *t)
     !strcmp(t->text, "string") ||
     !strcmp(t->text, "size_t");
     return returnBool;
+}
+
+bool isLiteral(Token *t)
+{
+    if(t->type == TOKEN_CHAR || t->type == TOKEN_STRING || t->type == TOKEN_NUMBER) return true;
+    else return false;
 }
 
 static const char *tokenTypeName(TokenType t)
@@ -89,7 +97,10 @@ Node *handleParam(Parser *p, bool decleration)
         Token typeTok = consume(p, TOKEN_KEYWORD, NULL, "Expected a type keyword to start parameter declaration");
         param->varDecl.name = typeTok.text;
         Token valueTok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected parameter name after type");
-        param->varDecl.value = valueTok.text;
+        Node *valueLiteral = malloc(sizeof(Node));
+        valueLiteral->type = NODE_LITERAL;
+        valueLiteral->literal.value = valueTok.text;
+        param->varDecl.value = valueLiteral;
         return param;
     }
     else
@@ -147,30 +158,166 @@ Node **handleArgList(Parser *p, bool decleration, int *outCount)
     return params;
 }
 
+OperatorType lookupOperator(Token t)
+{
+    if (t.type != TOKEN_PUNCTUATION && t.type != TOKEN_KEYWORD && t.type != TOKEN_OPERATOR)
+    return OPERATOR_NONE;
+
+    if (!strcmp(t.text, ";") || !strcmp(t.text, "{"))  return OPERATOR_END_EXP;
+    if (!strcmp(t.text, "+"))  return OPERATOR_ADD;
+    if (!strcmp(t.text, "="))  return OPERATOR_ASSIGN;
+    if (!strcmp(t.text, "*"))  return OPERATOR_MULTIPLY;
+    if (!strcmp(t.text, "&&")) return OPERATOR_LOGICAL_AND;
+    //STUB, add more operators
+
+    return OPERATOR_NONE;
+}
+
 Node* nudUnaryPlus(Parser *p)
 {
 
 }
 
-Node* nudPrimary(Parser *p)
+Node* nudPrimary(Parser *p) //build literal or var node from previous token
 {
+    Token tok = PREV(p); //checks token we just skipped
 
+    Node *node = malloc(sizeof(Node));
+    if (isLiteral(&tok))
+    {
+        node->type = NODE_LITERAL;
+        node->literal.value = tok.text;
+    }
+    else // identifier
+    {
+        node->type = NODE_VAR;
+        node->var.name = tok.text;
+    }
+    return node;
 }
 
-Node* ledBinary(Parser *p, Node *left)
+Node* ledBinaryLeft(Parser *p, Node *left) //build new left, starts on right of op, creates binary expression with left, operator, right
 {
+    Node *exp = malloc(sizeof(Node)); //allocate expression node
 
+    Token opToken = PREV(p); //operator token is token just skipped
+    OperatorType opType = lookupOperator(opToken); //get operator type of current operator
+    Node *op = malloc(sizeof(Node));
+
+    op->type = NODE_OPERATOR;
+    op->operator.lbp = rules[opType].operator.lbp; //save for print
+    int rbp = rules[opType].operator.lbp; //saved for printing
+
+    exp->type = NODE_BINARY_EXPR;
+    exp->binaryExpr.leftExp = left; //given left is left of binary exp
+    exp->binaryExpr.operator = op; //set operator to current operator
+    exp->binaryExpr.rightExp = parseExpression(p, rbp); //parse right of exp
+
+    return exp; //return binary expression as new left
 }
 
-void initRules(void)
+Node* ledBinaryRight(Parser *p, Node *left) //right assoc version
 {
-    rules[OPERATOR_LOGICAL_AND] = (PrattOperator){ OPERATOR_LOGICAL_AND, 50, true, NULL, ledBinary};
-    rules[OPERATOR_ADD]      = (PrattOperator){ OPERATOR_ADD, 120, true, nudUnaryPlus, ledBinary };
-    rules[OPERATOR_MULTIPLY] = (PrattOperator){ OPERATOR_MULTIPLY, 130, true, NULL, ledBinary };
+    Node *exp = malloc(sizeof(Node));
+
+    Token opToken = PREV(p);
+    OperatorType opType = lookupOperator(opToken);
+    Node *op = malloc(sizeof(Node));
+
+    op->type = NODE_OPERATOR;
+    op->operator.lbp = rules[opType].operator.lbp; //save for print
+    int rbp = rules[opType].operator.lbp - 1; 
+
+    exp->type = NODE_BINARY_EXPR;
+    exp->binaryExpr.leftExp = left; 
+    exp->binaryExpr.operator = op; 
+    exp->binaryExpr.rightExp = parseExpression(p, rbp); //recurse for right exp
+
+    return exp; //return binary expression as new left
 }
-Node *handleExpression(Parser *p, int start, int end)
+
+void initRules(void) // building the operator table
 {
-    
+    rules[OPERATOR_END_EXP] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = -1,
+            .nud = NULL,
+        }
+    };
+
+    rules[OPERATOR_ASSIGN] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 20,
+            .nud = NULL,
+            .led = ledBinaryRight
+        }
+    };
+
+    rules[OPERATOR_LOGICAL_AND] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 50,
+            .nud = NULL,
+            .led = ledBinaryLeft
+        }
+    };
+
+    rules[OPERATOR_ADD] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 120,
+            .nud = nudUnaryPlus,
+            .led = ledBinaryLeft
+        }
+    };
+
+    rules[OPERATOR_MULTIPLY] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 130,
+            .nud = NULL,
+            .led = ledBinaryLeft
+        }
+    };
+}
+
+
+Node *parseExpression(Parser *p, int rbp) //parses the actual stream of expression tokens
+{
+    Token tok = CUR(p);
+    OperatorType opType = lookupOperator(tok); // maps Token -> OperatorType
+
+    Node *left = malloc(sizeof(Node));
+    if (opType != OPERATOR_NONE && rules[opType].operator.nud != NULL) //consume operator
+    {
+        skip(p, "advancing past prefix/nud token");
+        left = rules[opType].operator.nud(p);
+    }
+    else if (isLiteral(&tok) || IS_IDENTIFIER(p)) //consume literal/variable
+    {
+        skip(p, "advancing past literal/identifier");
+        left = nudPrimary(p); 
+    }
+    else //unexpected token error
+    {
+        parserError("Unexpected token '%s' at position %d, expected start of expression", tok.text, p->pos);
+    }
+
+    while (1)
+    {
+        Token nextTok = CUR(p);
+        OperatorType nextOp = lookupOperator(nextTok); //peek next token
+        int lbp = (nextOp != OPERATOR_NONE) ? rules[nextOp].operator.lbp : 0; //lbp is 0 if next is identifier/literal
+
+        if (lbp <= rbp) break;
+
+        skip(p, "advancing past infix/led token");
+        left = rules[nextOp].operator.led(p, left); //call led
+    }
+
+    return left;
 }
 
 Node *handleIfStatement(Parser *p)
@@ -186,10 +333,9 @@ Node *handleExpressionStatement(Parser *p)
     {
         skip(p, "expected semicolon before end of file!");
     }
-    int endpos = p->pos; //cache ending position
     p->pos = startpos;
     expressionStatement->type = NODE_EXPR_STMT;
-    expressionStatement->exprStmt.expr = handleExpression(p, startpos, endpos);
+    expressionStatement->exprStmt.expr = parseExpression(p, 0);
     return expressionStatement;
 }
 

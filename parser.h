@@ -8,7 +8,7 @@ Written Aug 2026
 Defines the various types of node on the Abstract Syntax Tree, as well as other data types and macros.
 */
 
-typedef enum { //define different kinds of nodes
+typedef enum {
     NODE_PROGRAM,
     NODE_FUNCTION_DECL,
     NODE_VAR_DECL,
@@ -20,6 +20,7 @@ typedef enum { //define different kinds of nodes
     NODE_TERNARY_EXPR,
     NODE_VAR,
     NODE_LITERAL,
+    NODE_OPERATOR,
     NODE_IF_STMT,
     NODE_SWITCH_STMT,
     NODE_WHILE_STMT,
@@ -35,6 +36,8 @@ typedef enum { //define different kinds of nodes
 } NodeType;
 
 typedef enum {
+    OPERATOR_END_EXP,
+    OPERATOR_NONE,
     //comma
     OPERATOR_COMMA,
     //assignment
@@ -68,45 +71,44 @@ typedef enum {
 } OperatorType; //grouped by lbp
 
 typedef struct {
-    OperatorType type;
-    int lbp;
-    Node* (*nud)(Parser* p);
-    Node* (*led)(Parser* p, Node* left);
-} PrattOperator;
+    Token *tokens;
+    int tokenCount;
+    int pos;
+} Parser;
 
-typedef struct Node {
-    NodeType type;   // which kind of node 
+typedef struct Node{
+    NodeType type;
 
     union {
-        struct { //top level program
-            char **imports; //module imports
+        struct { // top level program
+            char **imports;
             int importCount;
-            struct Node **functions; //functions
+            struct Node **functions;
             int functionCount;
-            struct Node **globals; //global variables
+            struct Node **globals;
             int globalCount;
         } program;
 
-        struct { //function declaration
+        struct { // function declaration
             char *returnType;
             char *name;
             struct Node **params;
             int paramCount;
-            struct Node *body;   // pointer to a NODE_BLOCK
+            struct Node *body;
         } functionDecl;
 
-        struct { //variable declaration
+        struct { // variable declaration
             char *name;
-            char *value;
+            struct Node *value;
         } varDecl;
 
-        struct { //typedef aliasing
+        struct { // typedef aliasing
             char *aliasName;
-            struct Node *underlyingInstance; // set when aliasing an inline struct/union/enum/object
-            char *underlyingTypeName;        // set when aliasing a plain existing type (e.g. "int", "MyStruct")
+            struct Node *underlyingInstance;
+            char *underlyingTypeName;
         } typeDecl;
 
-        struct { //instance decleration 
+        struct { // instance declaration
             char *name;
             struct Node **fields;
             int fieldCount;
@@ -114,56 +116,54 @@ typedef struct Node {
             int methodCount;
         } instanceDecl;
 
-        struct { //block of statements enclosed by {}
-            struct Node **statements; 
+        struct { // block
+            struct Node **statements;
             int count;
         } block;
 
-        struct { //expression statement (ie procedure invocations or assignment)
+        struct { // expression statement
             struct Node *expr;
         } exprStmt;
 
-        struct { //call expression, like calling a function to return a value
+        struct { // call expression
             char *name;
             struct Node **args;
             int argCount;
         } callExpr;
 
-        struct { //variable reference
+        struct { // variable reference
             char *name;
         } var;
 
-        struct { //value literal
+        struct { // value literal
             char *value;
-        }literal;
+        } literal;
 
-        struct { //unary expression
-            PrattOperator *operator;
-            Node *exp;
-        }binaryExpr;
+        struct { // operator
+            int lbp;
+            struct Node *(*nud)(Parser *p);
+            struct Node *(*led)(Parser *p, struct Node *left);
+        } operator;
 
-        struct { //binary expression
-            PrattOperator *operator;
-            Node *leftExp;
-            Node *rightExp;
-        }binaryExpr;
+        struct { // unary expression
+            struct Node *operator;
+            struct Node *exp;
+        } unaryExpr;
 
-        struct { //ternary expression
-            PrattOperator *operator;
-            Node *conditionExp;
-            Node *ifTrueExp;
-            Node *ifFalseExp;
-        }binaryExpr;
+        struct { // binary expression
+            struct Node *operator;
+            struct Node *leftExp;
+            struct Node *rightExp;
+        } binaryExpr;
 
-        // ... one struct per NodeType (STUB currently)
+        struct { // ternary expression
+            struct Node *operator;
+            struct Node *conditionExp;
+            struct Node *ifTrueExp;
+            struct Node *ifFalseExp;
+        } ternaryExpr;
     };
 } Node;
-
-typedef struct {
-    Token *tokens;
-    int tokenCount;
-    int pos;
-} Parser;
 
 // current-token shorthand
 #define PREV(p)              ((p)->tokens[(p)->pos-1])
@@ -198,5 +198,6 @@ void skip(Parser *p, const char *context);
 Node *parse(Parser *p);
 
 //operator rule table
-PrattOperator rules[17];
+void initRules(void);
+Node rules[17];
 #endif

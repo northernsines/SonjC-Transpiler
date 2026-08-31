@@ -19,7 +19,11 @@ typedef enum {
     NODE_BINARY_EXPR,
     NODE_TERNARY_EXPR,
     NODE_VAR,
-    NODE_LITERAL,
+    NODE_INT_LITERAL,
+    NODE_FLOAT_LITERAL,
+    NODE_FIXED_LITERAL,
+    NODE_CHAR_LITERAL,
+    NODE_STRING_LITERAL,
     NODE_OPERATOR,
     NODE_IF_STMT,
     NODE_SWITCH_STMT,
@@ -135,9 +139,25 @@ typedef struct Node{
             char *name;
         } var;
 
-        struct { // value literal
-            char *value;
-        } literal;
+        struct { // int literal
+            int value;
+        } intLiteral;
+
+        struct { // float literal
+            float value;
+        } floatLiteral;
+
+        struct { // fixed literal
+            int value;
+        } fixedLiteral;
+
+        struct { // char literal
+            char value;
+        } charLiteral;
+
+        struct { // string literal
+            char* value;
+        } stringLiteral;
 
         struct { // operator
             int lbp;
@@ -199,5 +219,5 @@ Node *parse(Parser *p);
 
 //operator rule table
 void initRules(void);
-Node rules[17];
+extern Node rules[17];
 #endif

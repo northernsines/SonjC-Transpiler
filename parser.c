@@ -10,6 +10,7 @@ Written Aug 2026
 Parses tokens emitted by the lexer into an Abstract Syntax Tree.
 */
 
+Node rules[17];
 Node *parseExpression(Parser*, int);
 
 void vparserError(const char *message, va_list args)
@@ -42,7 +43,14 @@ bool isTypeName(Token *t)
 
 bool isLiteral(Token *t)
 {
-    if(t->type == TOKEN_CHAR || t->type == TOKEN_STRING || t->type == TOKEN_NUMBER) return true;
+    if(
+        t->type == TOKEN_CHAR || 
+        t->type == TOKEN_STRING || 
+        t->type == TOKEN_NUMBER || 
+        t->type == TOKEN_FLOAT || 
+        t->type == TOKEN_FIXED
+    ) 
+    return true;
     else return false;
 }
 
@@ -206,7 +214,7 @@ Node* ledBinaryLeft(Parser *p, Node *left) //build new left, starts on right of 
 
     op->type = NODE_OPERATOR;
     op->operator.lbp = rules[opType].operator.lbp; //save for print
-    int rbp = rules[opType].operator.lbp; //saved for printing
+    int rbp = rules[opType].operator.lbp; 
 
     exp->type = NODE_BINARY_EXPR;
     exp->binaryExpr.leftExp = left; //given left is left of binary exp
@@ -217,7 +225,7 @@ Node* ledBinaryLeft(Parser *p, Node *left) //build new left, starts on right of 
 }
 
 Node* ledBinaryRight(Parser *p, Node *left) //right assoc version
-{
+{ //copying the exact same function with a single literal edit because i couldnt be bothered to generalize the binary function is a bit of a disgusting kludge and im sorry
     Node *exp = malloc(sizeof(Node));
 
     Token opToken = PREV(p);
@@ -225,13 +233,13 @@ Node* ledBinaryRight(Parser *p, Node *left) //right assoc version
     Node *op = malloc(sizeof(Node));
 
     op->type = NODE_OPERATOR;
-    op->operator.lbp = rules[opType].operator.lbp; //save for print
+    op->operator.lbp = rules[opType].operator.lbp; 
     int rbp = rules[opType].operator.lbp - 1; 
 
     exp->type = NODE_BINARY_EXPR;
     exp->binaryExpr.leftExp = left; 
     exp->binaryExpr.operator = op; 
-    exp->binaryExpr.rightExp = parseExpression(p, rbp); //recurse for right exp
+    exp->binaryExpr.rightExp = parseExpression(p, rbp);
 
     return exp; //return binary expression as new left
 }

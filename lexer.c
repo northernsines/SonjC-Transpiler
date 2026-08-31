@@ -89,6 +89,7 @@ bool isKeyword(char *text)
         !strcmp(text, "asm") ||
         // SonjC-specific additions
         !strcmp(text, "elif") ||
+        !strcmp(text, "fixed") ||
         !strcmp(text, "iterate") ||
         !strcmp(text, "string") ||
         !strcmp(text, "object") ||
@@ -340,17 +341,22 @@ Token readNumber(Lexer *lexer, int *currentSize)
 {
     char currentChar = lexer->source[lexer->pos];
     bool seenDot = false;
+    bool seenF = false;
 
-    while((currentChar >= '0' && currentChar <= '9') || (currentChar == '.' && seenDot == false)) //digit and single decimal is allowed
+    while((currentChar >= '0' && currentChar <= '9') || (currentChar == '.' && seenDot == false) || (currentChar >= 'f' && seenF == false)) //digit and single decimal is allowed, as well as f for fixed marker.
     {
         lexer->currentText[*currentSize] = currentChar;
         (*currentSize)++;
         failIfOver(*currentSize, lexer);
         if(currentChar == '.') seenDot = true;
+        if(currentChar = 'f') seenF = true;
         advance(lexer); //next pos
         currentChar = lexer->source[lexer->pos];
     }
 
+    TokenType numberType = TOKEN_NUMBER; //int by default
+    if (seenDot) numberType = TOKEN_FLOAT; //float by default if point detected
+    if (seenF) numberType = TOKEN_FIXED; //fixed if fixed specifier detected
     lexer->currentText[*currentSize] = '\0';
     
     return(Token) {

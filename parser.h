@@ -1,6 +1,7 @@
 #ifndef PARSER_H
 #define PARSER_H
 #include "lexer.h"
+#include <stdint.h>
 
 /*
 SonjC Parser Header File
@@ -187,6 +188,7 @@ typedef struct Node{
             struct Node *ifTrueExp;
             struct Node *ifFalseExp;
         } ternaryExpr;
+        
     };
 } Node;
 
@@ -199,10 +201,26 @@ typedef struct Node{
 #define IS_PUNCT(p, s)       (CUR(p).type == TOKEN_PUNCTUATION && !strcmp(CUR(p).text, (s)))
 #define IS_KEYWORD(p, s)     (CUR(p).type == TOKEN_KEYWORD && !strcmp(CUR(p).text, (s)))
 #define IS_IDENTIFIER(p)     (CUR(p).type == TOKEN_IDENTIFIER)
+#define IS_LITERAL(p) ( \
+    CUR(p).type == TOKEN_INTEGER || \
+    CUR(p).type == TOKEN_STRING  || \
+    CUR(p).type == TOKEN_CHAR    || \
+    CUR(p).type == TOKEN_FLOAT   || \
+    CUR(p).type == TOKEN_FIXED   || \
+    (CUR(p).type == TOKEN_KEYWORD && (!strcmp(CUR(p).text, "true") || !strcmp(CUR(p).text, "false"))) \
+)
 
 #define PREV_PUNCT(p, s)     (PREV(p).type == TOKEN_PUNCTUATION && !strcmp(CUR(p).text, (s)))
 #define PREV_KEYWORD(p, s)   (PREV(p).type == TOKEN_KEYWORD && !strcmp(CUR(p).text, (s)))
 #define PREV_IDENTIFIER(p)   (PREV(p).type == TOKEN_IDENTIFIER)
+#define PREV_LITERAL(p) ( \
+    PREV(p).type == TOKEN_INTEGER || \
+    PREV(p).type == TOKEN_STRING  || \
+    PREV(p).type == TOKEN_CHAR    || \
+    PREV(p).type == TOKEN_FLOAT   || \
+    PREV(p).type == TOKEN_FIXED   || \
+    (PREV(p).type == TOKEN_KEYWORD && (!strcmp(PREV(p).text, "true") || !strcmp(PREV(p).text, "false"))) \
+)
 
 #define NEXT_PUNCT(p, s)     (PREV(p).type == TOKEN_PUNCTUATION && !strcmp(CUR(p).text, (s)))
 #define NEXT_KEYWORD(p, s)   (PREV(p).type == TOKEN_KEYWORD && !strcmp(CUR(p).text, (s)))

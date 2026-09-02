@@ -41,19 +41,6 @@ bool isTypeName(Token *t)
     return returnBool;
 }
 
-bool isLiteral(Token *t)
-{
-    if(
-        t->type == TOKEN_CHAR || 
-        t->type == TOKEN_STRING || 
-        t->type == TOKEN_INTEGER || 
-        t->type == TOKEN_FLOAT || 
-        t->type == TOKEN_FIXED
-    ) 
-    return true;
-    else return false;
-}
-
 static const char *tokenTypeName(TokenType t)
 {
     switch (t)
@@ -92,6 +79,12 @@ Token consume(Parser *p, TokenType expectedType, const char *expectedText, const
     return tok;
 }
 
+void skip(Parser *p, const char *context)
+{
+    if (p->pos > p->tokenCount) parserError("%s (reached end of file)", context);
+    p->pos++;
+}
+
 int popChar(char *str, size_t index) {
     if (!str) return -1;
     
@@ -103,85 +96,125 @@ int popChar(char *str, size_t index) {
     return 0;
 }
 
-Node *handleLiteral(Parser *p, Token *t)
+int pow10(int num)
 {
-    Node literal;
-    switch(t->type) //map tokentype to node types for literals
+    if (num == 0) return 1;
+    else return 10 * pow10(num - 1); //recursive exponentation
+}
+
+Node *handleLiteral(Parser *p)
+{
+    Token t = CUR(p);
+    Node *literal = malloc(sizeof(Node));
+    switch(t.type) //map tokentype to node types for literals
     {
-        case TOKEN_INTEGER: literal.type = NODE_INT_LITERAL;    break;
-        case TOKEN_FLOAT:   literal.type = NODE_FLOAT_LITERAL;  break;
-        case TOKEN_FIXED:   literal.type = NODE_FIXED_LITERAL;  break;
-        case TOKEN_CHAR:    literal.type = NODE_CHAR_LITERAL;   break;
-        case TOKEN_STRING:  literal.type = NODE_STRING_LITERAL; break;
-        case TOKEN_KEYWORD: literal.type = NODE_BOOL_LITERAL;   break;
+        case TOKEN_INTEGER: literal->type = NODE_INT_LITERAL;    break;
+        case TOKEN_FLOAT:   literal->type = NODE_FLOAT_LITERAL;  break;
+        case TOKEN_FIXED:   literal->type = NODE_FIXED_LITERAL;  break;
+        case TOKEN_CHAR:    literal->type = NODE_CHAR_LITERAL;   break;
+        case TOKEN_STRING:  literal->type = NODE_STRING_LITERAL; break;
+        case TOKEN_KEYWORD: literal->type = NODE_BOOL_LITERAL;   break;
+        default: parserError("Expected literal in literal slot at position %d", p->pos);
     }
-    char* str = malloc(sizeof(t->text));
+    char* str = malloc(sizeof(t.text));
     if (str == NULL) parserError("malloc for string literal allocation returned null");
-    strcpy(str, t->text);
+    strcpy(str, t.text);
     int strSize = strlen(str);
-    if(literal.type == NODE_INT_LITERAL) //convert values to proper types
+    if(literal->type == NODE_INT_LITERAL) //convert values to proper types
     {
-        literal.intLiteral.value = atoi(str);
+        literal->intLiteral.value = atoi(str);
     }
-    if(literal.type == NODE_FLOAT_LITERAL)
+    else if(literal->type == NODE_FLOAT_LITERAL)
     {
-        literal.floatLiteral.value = atof(str);
+        literal->floatLiteral.value = atof(str);
     }
-    if(literal.type == NODE_FIXED_LITERAL)
+    else if(literal->type == NODE_FIXED_LITERAL) // Q32.32 fixed point algorithm
     {
-        int acc = 0;
-        size_t bitWidth;
         int i;
-        for(i = 0; i < strSize; i++) //iterate until detect ., store binary width
+        char *intPartStr = malloc(strlen(str));
+        char *fracPartStr = malloc(strlen(str));
+        for(i = 0; i < strSize; i++) //iterate until detect . build left string
         {
             char ch = str[i];
             bool isDot = ch == '.';
-            int val = ch - '0';
             if(isDot) break;
             else
             {
-                acc += val;
+                intPartStr[i] = ch;
             }
         }
-        bitWidth = sizeof(acc) * __CHAR_BIT__; //total binary left offset
-        bool fail = popChar(str, i);
-        if(fail) parserError("Problem handling fixed point literal at position %d.", p->pos);
-        char *endptr;
-        __uint64_t underlying = strtoull(str, endptr, 10);
-        size_t offset = 32 - bitWidth;
-        underlying = underlying << offset;
-        literal.fixedLiteral.value = underlying;
+        intPartStr[i] = '\0';
+        i++; //skip dot
+        int ioffset = i;
+        for(i = ioffset; i < strSize; i++) //iterate until null term, build right string
+        {
+            char ch = str[i];
+            bool isNull = ch == '\0';
+            if(isNull) break;
+            else
+            {
+                fracPartStr[i-ioffset] = ch;
+            }
+        }
+        fracPartStr[i-ioffset] = '\0';
+        uint64_t intPart = strtoull(intPartStr, NULL, 10); 
+        uint64_t fracDigits = strtoull(fracPartStr, NULL, 10);
+        size_t fracLen = strlen(fracPartStr);
+
+        __uint128_t scaled = (__uint128_t)fracDigits << 32; 
+        uint64_t fracPart = (uint64_t)(scaled / pow10(fracLen)); // pow10 = your own int pow
+
+        uint64_t underlying = (intPart << 32) | fracPart; 
+        literal->fixedLiteral.value = underlying;
     }
+    else if(literal->type == NODE_CHAR_LITERAL)
+    {
+        literal->charLiteral.value = *str;
+    }
+    else if(literal->type == NODE_STRING_LITERAL)
+    {
+        strcpy(literal->stringLiteral.value, str);
+    }
+    else if(literal->type == NODE_BOOL_LITERAL)
+    {
+        if(!strcmp(str, "true")) literal->boolLiteral.value = true;
+        else literal->boolLiteral.value = false;
+    }
+    skip(p, "advancing past literal");
+    return literal;
 }
 
-void skip(Parser *p, const char *context)
+Node *handleVarDecl(Parser *p)
 {
-    if (p->pos > p->tokenCount) parserError("%s (reached end of file)", context);
-    p->pos++;
+        Node *varDecl = malloc(sizeof(Node));
+        varDecl->type = NODE_VAR_DECL;
+        Token typeTok = consume(p, TOKEN_KEYWORD, NULL, "Expected a type keyword to start parameter declaration");
+        varDecl->varDecl.name = typeTok.text;
+        consume(p, TOKEN_IDENTIFIER, NULL, "Expected parameter name after type");
+        if(!(NEXT(p).type == TOKEN_OPERATOR || TOKEN_PUNCTUATION && !strcmp(NEXT(p).text, "="))) //exit early if no initalization
+        {
+            varDecl->varDecl.value = NULL;
+            return varDecl;
+        }
+        skip(p, "expected decleration literal before end of file"); //skip =
+        Node *valueLiteral = malloc(sizeof(Node));
+        valueLiteral = handleLiteral(p);
+        return varDecl;
 }
 
 Node *handleParam(Parser *p, bool decleration)
 {
+    Node *param = malloc(sizeof(Node));
     if (decleration)
     {
-        Node *param = malloc(sizeof(Node));
-        param->type = NODE_VAR_DECL;
-        Token typeTok = consume(p, TOKEN_KEYWORD, NULL, "Expected a type keyword to start parameter declaration");
-        param->varDecl.name = typeTok.text;
-        Token valueTok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected parameter name after type");
-        Node *valueLiteral = malloc(sizeof(Node));
-        valueLiteral->type = NODE_LITERAL;
-        valueLiteral->literal.value = valueTok.text;
-        param->varDecl.value = valueLiteral;
+        param = handleVarDecl(p);
         return param;
     }
     else
     {
-        Node *param = malloc(sizeof(Node));
-        if (literal)
+        if (IS_LITERAL(p))
         {
-            param->type = NODE_LITERAL;
-            param->literal.value = CUR(p).text;
+            param = handleLiteral(p);
         }
         else if (IS_IDENTIFIER(p))
         {
@@ -240,23 +273,23 @@ OperatorType lookupOperator(Token t)
 
 Node* nudUnaryPlus(Parser *p)
 {
-
+    //STUB
 }
 
 Node* nudPrimary(Parser *p) //build literal or var node from previous token
 {
-    Token tok = PREV(p); //checks token we just skipped
+    Token tok = CUR(p);
 
     Node *node = malloc(sizeof(Node));
-    if (isLiteral(&tok))
+    if (IS_LITERAL(p))
     {
-        node->type = NODE_LITERAL;
-        node->literal.value = tok.text;
+        node = handleLiteral(p);
     }
     else // identifier
     {
         node->type = NODE_VAR;
         node->var.name = tok.text;
+        skip(p, "advancing past identifier");
     }
     return node;
 }
@@ -361,9 +394,8 @@ Node *parseExpression(Parser *p, int rbp) //parses the actual stream of expressi
         skip(p, "advancing past prefix/nud token");
         left = rules[opType].operator.nud(p);
     }
-    else if (isLiteral(&tok) || IS_IDENTIFIER(p)) //consume literal/variable
+    else if (IS_LITERAL(p)|| IS_IDENTIFIER(p)) //consume literal/variable
     {
-        skip(p, "advancing past literal/identifier");
         left = nudPrimary(p); 
     }
     else //unexpected token error
@@ -389,7 +421,6 @@ Node *parseExpression(Parser *p, int rbp) //parses the actual stream of expressi
 Node *handleIfStatement(Parser *p)
 {
     //STUB implement if statements
-    
 }
 
 Node *handleExpressionStatement(Parser *p)

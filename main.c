@@ -1,6 +1,7 @@
 #include "parser.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include <string.h>
 
 Token *tokenArray;
@@ -11,7 +12,6 @@ SonjC Main Entry Point
 Written Aug 2026
 Handles the runtime and execution of each step of compilation.
 */
-
 
 char *read_file(const char *path) {
     FILE *f = fopen(path, "rb");
@@ -53,17 +53,37 @@ void printNode(Node *node, int depth)
 
     switch (node->type)
     {
-        case NODE_LITERAL:
-            printf("Literal: %s\n", node->literal.value);
+        case NODE_INT_LITERAL:
+            printf("Int: %d\n", node->intLiteral.value);
             break;
 
+        case NODE_FLOAT_LITERAL:
+            printf("Float: %f\n", node->floatLiteral.value);
+            break;
+
+        case NODE_FIXED_LITERAL:
+            printf("Fixed: %" PRIu64 "\n", node->fixedLiteral.value);
+            break;
+
+        case NODE_CHAR_LITERAL:
+            printf("Char: %c \n", node->charLiteral.value);
+            break;
+
+        case NODE_STRING_LITERAL:
+            printf("String: %s\n", node->stringLiteral.value);
+            break;
+        
+        case NODE_BOOL_LITERAL:
+            printf("Bool: %s\n", node->boolLiteral.value ? "true" : "false");
+            break;
+        
         case NODE_VAR:
             printf("Var: %s\n", node->var.name);
             break;
 
         case NODE_VAR_DECL:
             printf("VarDecl: %s\n", node->varDecl.name);
-            printNode(node->varDecl.value, depth + 1);
+            if(node->varDecl.value != NULL) printNode(node->varDecl.value, depth + 1);
             break;
 
         case NODE_BINARY_EXPR:

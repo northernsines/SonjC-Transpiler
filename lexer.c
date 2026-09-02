@@ -350,7 +350,7 @@ Token readNumber(Lexer *lexer, int *currentSize)
         (*currentSize)++;
         failIfOver(*currentSize, lexer);
         if(currentChar == '.') seenDot = true;
-        if(currentChar = 'f') seenF = true;
+        if(currentChar == 'f') seenF = true;
         advance(lexer); //next pos
         currentChar = lexer->source[lexer->pos];
     }
@@ -593,7 +593,7 @@ Token nextToken(Lexer *lexer)
             advance(lexer);
             return tok;
         }
-        if(tok.type == TOKEN_INTEGER || TOKEN_FLOAT || TOKEN_FIXED) //dont advance for number, it does that on its own.
+        if(tok.type == TOKEN_INTEGER || tok.type == TOKEN_FLOAT || tok.type == TOKEN_FIXED) //dont advance for number, it does that on its own.
         {
             return tok;
         }

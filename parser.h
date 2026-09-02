@@ -37,6 +37,7 @@ typedef enum {
     NODE_GOTO_STMT,
     NODE_LABEL_STMT,
     NODE_INSTANCE_DECL,
+    NODE_BOOL_LITERAL
 } NodeType;
 
 typedef enum {
@@ -148,7 +149,7 @@ typedef struct Node{
         } floatLiteral;
 
         struct { // fixed literal
-            int value;
+            __uint64_t value;
         } fixedLiteral;
 
         struct { // char literal
@@ -158,6 +159,10 @@ typedef struct Node{
         struct { // string literal
             char* value;
         } stringLiteral;
+
+        struct { // bool literal
+            bool value;
+        } boolLiteral;        
 
         struct { // operator
             int lbp;

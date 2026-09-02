@@ -46,7 +46,7 @@ bool isLiteral(Token *t)
     if(
         t->type == TOKEN_CHAR || 
         t->type == TOKEN_STRING || 
-        t->type == TOKEN_NUMBER || 
+        t->type == TOKEN_INTEGER || 
         t->type == TOKEN_FLOAT || 
         t->type == TOKEN_FIXED
     ) 
@@ -61,11 +61,13 @@ static const char *tokenTypeName(TokenType t)
         case TOKEN_IDENTIFIER:  return "identifier";
         case TOKEN_KEYWORD:     return "keyword";
         case TOKEN_PUNCTUATION: return "punctuation";
-        case TOKEN_NUMBER:      return "number";
+        case TOKEN_INTEGER:     return "integer";
+        case TOKEN_FLOAT:       return "float";
+        case TOKEN_FIXED:       return "fixed";
         case TOKEN_STRING:      return "string";
         case TOKEN_CHAR:        return "char";
         case TOKEN_EOF:         return "end of file";
-        default:                return "token";
+        default:                return "unknown token";
     }
 }
 
@@ -79,7 +81,7 @@ Token consume(Parser *p, TokenType expectedType, const char *expectedText, const
     bool textMatches = (expectedText == NULL) || !strcmp(tok.text, expectedText);
 
     if (!typeMatches || !textMatches)
-    {
+    { 
         if (expectedText)
             parserError("%s — expected '%s', got '%s' at position %d", context, expectedText, tok.text, p->pos);
         else
@@ -88,6 +90,68 @@ Token consume(Parser *p, TokenType expectedType, const char *expectedText, const
 
     p->pos++;
     return tok;
+}
+
+int popChar(char *str, size_t index) {
+    if (!str) return -1;
+    
+    size_t len = strlen(str);
+    if (index >= len) return -1; // Out of bounds or empty string
+
+    memmove(&str[index], &str[index + 1], len - index);
+    
+    return 0;
+}
+
+Node *handleLiteral(Parser *p, Token *t)
+{
+    Node literal;
+    switch(t->type) //map tokentype to node types for literals
+    {
+        case TOKEN_INTEGER: literal.type = NODE_INT_LITERAL;    break;
+        case TOKEN_FLOAT:   literal.type = NODE_FLOAT_LITERAL;  break;
+        case TOKEN_FIXED:   literal.type = NODE_FIXED_LITERAL;  break;
+        case TOKEN_CHAR:    literal.type = NODE_CHAR_LITERAL;   break;
+        case TOKEN_STRING:  literal.type = NODE_STRING_LITERAL; break;
+        case TOKEN_KEYWORD: literal.type = NODE_BOOL_LITERAL;   break;
+    }
+    char* str = malloc(sizeof(t->text));
+    if (str == NULL) parserError("malloc for string literal allocation returned null");
+    strcpy(str, t->text);
+    int strSize = strlen(str);
+    if(literal.type == NODE_INT_LITERAL) //convert values to proper types
+    {
+        literal.intLiteral.value = atoi(str);
+    }
+    if(literal.type == NODE_FLOAT_LITERAL)
+    {
+        literal.floatLiteral.value = atof(str);
+    }
+    if(literal.type == NODE_FIXED_LITERAL)
+    {
+        int acc = 0;
+        size_t bitWidth;
+        int i;
+        for(i = 0; i < strSize; i++) //iterate until detect ., store binary width
+        {
+            char ch = str[i];
+            bool isDot = ch == '.';
+            int val = ch - '0';
+            if(isDot) break;
+            else
+            {
+                acc += val;
+            }
+        }
+        bitWidth = sizeof(acc) * __CHAR_BIT__; //total binary left offset
+        bool fail = popChar(str, i);
+        if(fail) parserError("Problem handling fixed point literal at position %d.", p->pos);
+        char *endptr;
+        __uint64_t underlying = strtoull(str, endptr, 10);
+        size_t offset = 32 - bitWidth;
+        underlying = underlying << offset;
+        literal.fixedLiteral.value = underlying;
+    }
 }
 
 void skip(Parser *p, const char *context)
@@ -114,13 +178,6 @@ Node *handleParam(Parser *p, bool decleration)
     else
     {
         Node *param = malloc(sizeof(Node));
-        bool literal =
-            CUR(p).type == TOKEN_NUMBER ||
-            CUR(p).type == TOKEN_STRING ||
-            CUR(p).type == TOKEN_CHAR ||
-            IS_KEYWORD(p, "true") ||
-            IS_KEYWORD(p, "false");
-
         if (literal)
         {
             param->type = NODE_LITERAL;
@@ -289,6 +346,7 @@ void initRules(void) // building the operator table
             .led = ledBinaryLeft
         }
     };
+    //STUB continue adding operator rules
 }
 
 
@@ -330,6 +388,7 @@ Node *parseExpression(Parser *p, int rbp) //parses the actual stream of expressi
 
 Node *handleIfStatement(Parser *p)
 {
+    //STUB implement if statements
     
 }
 

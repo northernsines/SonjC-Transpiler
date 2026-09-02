@@ -337,6 +337,7 @@ Token handleString(Lexer *lexer, int *currentSize)
 
     return (Token){0};
 }
+
 Token readNumber(Lexer *lexer, int *currentSize)
 {
     char currentChar = lexer->source[lexer->pos];
@@ -354,7 +355,7 @@ Token readNumber(Lexer *lexer, int *currentSize)
         currentChar = lexer->source[lexer->pos];
     }
 
-    TokenType numberType = TOKEN_NUMBER; //int by default
+    TokenType numberType = TOKEN_INTEGER; //int by default
     if (seenDot) numberType = TOKEN_FLOAT; //float by default if point detected
     if (seenF) numberType = TOKEN_FIXED; //fixed if fixed specifier detected
     lexer->currentText[*currentSize] = '\0';
@@ -362,7 +363,7 @@ Token readNumber(Lexer *lexer, int *currentSize)
     return(Token) {
         .length = *currentSize,
         .text = lexer->currentText,
-        .type = TOKEN_NUMBER
+        .type = numberType
     };
 }
 
@@ -426,8 +427,6 @@ Token handlePunctuationOperatorNumber(Lexer *lexer, int *currentSize, TokenType 
         {
             *currentType = TOKEN_OPERATOR;
         }
-        else *currentType = TOKEN_NUMBER;
-
         if(currentChar == '\n') newLine(lexer); //new line if newline
 
         lexer->currentText[0] = currentChar;
@@ -594,7 +593,7 @@ Token nextToken(Lexer *lexer)
             advance(lexer);
             return tok;
         }
-        if(tok.type == TOKEN_NUMBER) //dont advance for number, it does that on its own.
+        if(tok.type == TOKEN_INTEGER || TOKEN_FLOAT || TOKEN_FIXED) //dont advance for number, it does that on its own.
         {
             return tok;
         }
@@ -632,7 +631,7 @@ char *tokentypeToString(TokenType type)
         type == TOKEN_PUNCTUATION ? "PUNC" :
         type == TOKEN_OPERATOR ? "OPER" :
         type == TOKEN_STRING ? "STRN" :
-        type == TOKEN_NUMBER ? "NUMR" :
+        type == TOKEN_IDENTIFIER ? "NUMR" :
         type == TOKEN_DIRECTIVE ? "DIRV":
         type == TOKEN_NONE ? "NONE":
         type == TOKEN_EOF ? "EOFL":

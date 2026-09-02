@@ -39,6 +39,7 @@ typedef enum {
     NODE_LABEL_STMT,
     NODE_INSTANCE_DECL,
     NODE_BOOL_LITERAL
+    //STUB, confirm all possible nodes added
 } NodeType;
 
 typedef enum {
@@ -74,6 +75,7 @@ typedef enum {
     //postfix
     OPERATOR_POSTFIX_INCREMENT,
     OPERATOR_POSTFIX_DECREMENT
+    //STUB, add operators
 } OperatorType; //grouped by lbp
 
 typedef struct {
@@ -188,7 +190,7 @@ typedef struct Node{
             struct Node *ifTrueExp;
             struct Node *ifFalseExp;
         } ternaryExpr;
-        
+        //STUB add all nodes
     };
 } Node;
 

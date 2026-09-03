@@ -10,7 +10,7 @@ Written Aug 2026
 Parses tokens emitted by the lexer into an Abstract Syntax Tree.
 */
 
-Node rules[30];
+Node rules[60];
 Node *parseExpression(Parser*, int);
 
 void vparserError(const char *message, va_list args)

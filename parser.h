@@ -68,13 +68,16 @@ typedef enum {
     //multiplicative
     OPERATOR_MULTIPLY,
     OPERATOR_DIVIDE,
+    OPERATOR_MOD,
     //cast
     OPERATOR_CAST,
     //unary
     OPERATOR_LOGICAL_NOT,
+    OPERATOR_BITWISE_NOT,
+    OPERATOR_SIZEOF,
     //postfix
-    OPERATOR_POSTFIX_INCREMENT,
-    OPERATOR_POSTFIX_DECREMENT
+    OPERATOR_INCREMENT,
+    OPERATOR_DECREMENT
     //STUB, add operators
 } OperatorType; //grouped by lbp
 
@@ -244,5 +247,4 @@ Node *parse(Parser *p);
 
 //operator rule table
 void initRules(void);
-extern Node rules[17];
 #endif

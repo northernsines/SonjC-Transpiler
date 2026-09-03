@@ -14,11 +14,13 @@ void advance(Lexer *lexer)
     lexer->col++;
     lexer->pos++;
 }
+
 void retreat(Lexer *lexer)
 {
     lexer->col--;
     lexer->pos--;
 }
+
 void newLine(Lexer *lexer)
 {
     lexer->col = 0;

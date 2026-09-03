@@ -10,7 +10,7 @@ Written Aug 2026
 Parses tokens emitted by the lexer into an Abstract Syntax Tree.
 */
 
-Node rules[17];
+Node rules[30];
 Node *parseExpression(Parser*, int);
 
 void vparserError(const char *message, va_list args)
@@ -263,15 +263,21 @@ OperatorType lookupOperator(Token t)
 
     if (!strcmp(t.text, ";") || !strcmp(t.text, "{"))  return OPERATOR_END_EXP;
     if (!strcmp(t.text, "+"))  return OPERATOR_ADD;
+    if (!strcmp(t.text, "-"))  return OPERATOR_SUBTRACT;
+    if (!strcmp(t.text, "*"))  return OPERATOR_MULTIPLY;
+    if (!strcmp(t.text, "/"))  return OPERATOR_DIVIDE;
+    if (!strcmp(t.text, "%%"))  return OPERATOR_MOD;
     if (!strcmp(t.text, "="))  return OPERATOR_ASSIGN;
     if (!strcmp(t.text, "*"))  return OPERATOR_MULTIPLY;
     if (!strcmp(t.text, "&&")) return OPERATOR_LOGICAL_AND;
+    if (!strcmp(t.text, "!")) return OPERATOR_LOGICAL_NOT;
+    if (!strcmp(t.text, "~")) return OPERATOR_BITWISE_NOT;
     //STUB, add more operators
 
     return OPERATOR_NONE;
 }
 
-Node* nudUnaryPlus(Parser *p)
+Node* nudUnary(Parser *p)
 {
     //STUB
 }
@@ -292,6 +298,11 @@ Node* nudPrimary(Parser *p) //build literal or var node from previous token
         skip(p, "advancing past identifier");
     }
     return node;
+}
+
+Node* ledUnary(Parser *p, Node *left)
+{
+    //STUB
 }
 
 Node* ledBinaryLeft(Parser *p, Node *left) //build new left, starts on right of op, creates binary expression with left, operator, right
@@ -366,7 +377,16 @@ void initRules(void) // building the operator table
         .type = NODE_OPERATOR,
         .operator = {
             .lbp = 120,
-            .nud = nudUnaryPlus,
+            .nud = nudUnary,
+            .led = ledBinaryLeft
+        }
+    };
+
+    rules[OPERATOR_SUBTRACT] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 120,
+            .nud = nudUnary,
             .led = ledBinaryLeft
         }
     };
@@ -375,13 +395,67 @@ void initRules(void) // building the operator table
         .type = NODE_OPERATOR,
         .operator = {
             .lbp = 130,
+            .nud = nudUnary,
+            .led = ledBinaryLeft
+        }
+    };
+
+    rules[OPERATOR_MOD] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 130,
             .nud = NULL,
             .led = ledBinaryLeft
         }
     };
+
+    rules[OPERATOR_LOGICAL_NOT] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 140,
+            .nud = nudUnary,
+            .led = NULL,
+        }
+    };
+
+    rules[OPERATOR_BITWISE_NOT] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 140,
+            .nud = nudUnary,
+            .led = NULL,
+        }
+    };
+
+    rules[OPERATOR_INCREMENT] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 140,
+            .nud = nudUnary,
+            .led = ledUnary,
+        }
+    };
+
+    rules[OPERATOR_DECREMENT] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 140,
+            .nud = nudUnary,
+            .led = ledUnary,
+        }
+    };
+
+    rules[OPERATOR_SIZEOF] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 140,
+            .nud = nudUnary,
+            .led = NULL,
+        }
+    };
+
     //STUB continue adding operator rules
 }
-
 
 Node *parseExpression(Parser *p, int rbp) //parses the actual stream of expression tokens
 {

@@ -5,7 +5,7 @@
 /*
 SonjC Lexer Header File
 Written Aug 2026
-Defines token types and other constant values for the lexer
+Defines token types and other constant values for the lexer.
 */
 
 typedef enum {

@@ -191,7 +191,7 @@ Node *handleVarDecl(Parser *p)
         Token typeTok = consume(p, TOKEN_KEYWORD, NULL, "Expected a type keyword to start parameter declaration");
         varDecl->varDecl.name = typeTok.text;
         consume(p, TOKEN_IDENTIFIER, NULL, "Expected parameter name after type");
-        if(!(NEXT(p).type == TOKEN_OPERATOR || TOKEN_PUNCTUATION && !strcmp(NEXT(p).text, "="))) //exit early if no initalization
+        if((!(NEXT(p).type == TOKEN_OPERATOR || NEXT(p).type == TOKEN_PUNCTUATION) && !strcmp(NEXT(p).text, "="))) //exit early if no initalization
         {
             varDecl->varDecl.value = NULL;
             return varDecl;
@@ -199,6 +199,7 @@ Node *handleVarDecl(Parser *p)
         skip(p, "expected decleration literal before end of file"); //skip =
         Node *valueLiteral = malloc(sizeof(Node));
         valueLiteral = handleLiteral(p);
+        varDecl->varDecl.value = valueLiteral;
         return varDecl;
 }
 

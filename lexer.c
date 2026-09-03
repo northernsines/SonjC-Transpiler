@@ -631,7 +631,9 @@ char *tokentypeToString(TokenType type)
         type == TOKEN_PUNCTUATION ? "PUNC" :
         type == TOKEN_OPERATOR ? "OPER" :
         type == TOKEN_STRING ? "STRN" :
-        type == TOKEN_IDENTIFIER ? "NUMR" :
+        type == TOKEN_INTEGER ? "INTG" :
+        type == TOKEN_FLOAT ? "FLOT" :
+        type == TOKEN_FIXED ? "FIXD" :
         type == TOKEN_DIRECTIVE ? "DIRV":
         type == TOKEN_NONE ? "NONE":
         type == TOKEN_EOF ? "EOFL":

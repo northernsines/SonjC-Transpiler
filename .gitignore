@@ -1,4 +1,5 @@
 transpiler
+test_*.sc
 *.dSYM
 transpiler.dSYM
 .DS_STORE

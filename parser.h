@@ -192,6 +192,7 @@ typedef struct Node{
         } boolLiteral;        
 
         struct { // operator
+            OperatorType opType;
             int lbp;
             struct Node *(*nud)(Parser *p);
             struct Node *(*led)(Parser *p, struct Node *left);

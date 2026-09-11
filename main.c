@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <inttypes.h>
+#include <stdbool.h>
 #include <string.h>
 
 Token *tokenArray;
@@ -43,6 +44,57 @@ char *read_file(const char *path) {
 
     fclose(f);
     return buffer;
+}
+
+const char *operatorTypeToString(OperatorType op)
+{
+    switch (op)
+    {
+        case OPERATOR_END_EXP:              return "endExp";
+        case OPERATOR_NONE:                 return "none";
+        case OPERATOR_COMMA:                return ",";
+        case OPERATOR_ASSIGN:               return "=";
+        case OPERATOR_ASSIGN_ADD:           return "+=";
+        case OPERATOR_ASSIGN_SUBTRACT:      return "-=";
+        case OPERATOR_ASSIGN_MULTIPLY:      return "*=";
+        case OPERATOR_ASSIGN_DIVIDE:        return "/=";
+        case OPERATOR_ASSIGN_MOD:           return "%=";
+        case OPERATOR_BITWISE_ASSIGN_AND:   return "&=";
+        case OPERATOR_BITWISE_ASSIGN_OR:    return "|=";
+        case OPERATOR_BITWISE_ASSIGN_XOR:   return "^=";
+        case OPERATOR_BITWISE_ASSIGN_LEFTSHIFT:  return "<<=";
+        case OPERATOR_BITWISE_ASSIGN_RIGHTSHIFT: return ">>=";
+        case OPERATOR_TERNARY:              return "?";
+        case OPERATOR_LOGICAL_OR:           return "||";
+        case OPERATOR_LOGICAL_AND:          return "&&";
+        case OPERATOR_BITWISE_AND:          return "&";
+        case OPERATOR_BITWISE_OR:           return "|";
+        case OPERATOR_BITWISE_XOR:          return "^";
+        case OPERATOR_IS_EQUAL:             return "==";
+        case OPERATOR_IS_NOT_EQUAL:         return "!=";
+        case OPERATOR_GREATER_THAN:         return ">";
+        case OPERATOR_LESS_THAN:            return "<";
+        case OPERATOR_LESS_THAN_OREQ:       return "<=";
+        case OPERATOR_GREATER_THAN_OREQ:    return ">=";
+        case OPERATOR_SHIFT_LOW:            return "<<";
+        case OPERATOR_SHIFT_RIGHT:          return ">>";
+        case OPERATOR_ADD:                  return "+";
+        case OPERATOR_SUBTRACT:             return "-";
+        case OPERATOR_MULTIPLY:             return "*";
+        case OPERATOR_DIVIDE:               return "/";
+        case OPERATOR_MOD:                  return "%";
+        case OPERATOR_CAST:                 return "cast";
+        case OPERATOR_LOGICAL_NOT:          return "!";
+        case OPERATOR_BITWISE_NOT:          return "~";
+        case OPERATOR_SIZEOF:               return "sizeof";
+        case OPERATOR_INCREMENT:            return "++";
+        case OPERATOR_DECREMENT:            return "--";
+        case OPERATOR_PARENTHESIS:          return "()";
+        case OPERATOR_BRACKET:              return "[]";
+        case OPERATOR_DOT:                  return ".";
+        case OPERATOR_ARROW:                return "->";
+    }
+    return "unknown";
 }
 
 void printNode(Node *node, int depth)
@@ -87,7 +139,7 @@ void printNode(Node *node, int depth)
             break;
 
         case NODE_BINARY_EXPR:
-            printf("binaryExp: %d\n", node->binaryExpr.operator->operator.lbp);
+            printf("binaryExp: %s\n", operatorTypeToString(node->binaryExpr.operator->operator.opType));
             printNode(node->binaryExpr.leftExp, depth + 1);
             printNode(node->binaryExpr.rightExp, depth + 1);
             break;
@@ -143,13 +195,43 @@ void printNode(Node *node, int depth)
 }
 
 int main(int argc, char *argv[]) {
+    bool printHelp = false;
+    for (int i = 1; i < argc; i++)
+        if (strcmp(argv[i], "-help") == 0) printHelp = true;
+
+    if (printHelp) {
+        printf("SonjC Transpiler\n\n");
+        printf("usage: %s [-printtok] [-printast] [-help] <file.sc>\n\n", argv[0]);
+        printf("flags:\n");
+        printf("  -printtok    print the lexer token stream\n");
+        printf("  -printast    print the parsed AST\n");
+        printf("  -help        show this help message\n");
+        return 0;
+    }
+
     if (argc < 2) {
-        fprintf(stderr, "usage: %s <file.sc>\n", argv[0]); //not enough args
+        fprintf(stderr, "usage: %s [-printtok] [-printast] [-help] <file.sc>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
+
+    bool printTok = false;
+    bool printAst = false;
+    const char *filePath = NULL;
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-printtok") == 0) printTok = true;
+        else if (strcmp(argv[i], "-printast") == 0) printAst = true;
+        else filePath = argv[i];
+    }
+
+    if (!filePath) {
+        fprintf(stderr, "no input file provided\n");
+        exit(EXIT_FAILURE);
+    }
+
     tokens = 0;
 
-    char *source = read_file(argv[1]); //store file to source
+    char *source = read_file(filePath);
     Lexer lexer = { .source = source, .pos = 0, .line = 1, .col = 1, .charFilled = false, .charMode = false, .stringMode = false};
 
     size_t capacity = 64; //start with a capacity of 64 tokens
@@ -181,16 +263,18 @@ int main(int argc, char *argv[]) {
 
         if (tok.type == TOKEN_EOF) break; // escape on EOF iteration
     }
-    for (int i = 0; i < tokens; i++)
-    {
-        printf("[%02d] type=%s text: %s\n", i, tokentypeToString(tokenArray[i].type), tokenArray[i].text);
+    if (printTok) {
+        for (int i = 0; i < tokens; i++)
+        {
+            printf("[%02d] type=%s text: %s\n", i, tokentypeToString(tokenArray[i].type), tokenArray[i].text);
+        }
+        fflush(stdout);
     }
-    fflush(stdout);
 
     initRules();
     Parser parser = { .tokens = tokenArray, .tokenCount = tokens, .pos = 0 };
     Node *ast = parse(&parser);
-    printNode(ast, 0);
+    if (printAst) printNode(ast, 0);
 
     free(source);
     return 0;

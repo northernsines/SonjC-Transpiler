@@ -267,7 +267,7 @@ OperatorType lookupOperator(Token t)
     if (!strcmp(t.text, "-"))  return OPERATOR_SUBTRACT;
     if (!strcmp(t.text, "*"))  return OPERATOR_MULTIPLY;
     if (!strcmp(t.text, "/"))  return OPERATOR_DIVIDE;
-    if (!strcmp(t.text, "%%"))  return OPERATOR_MOD;
+    if (!strcmp(t.text, "%"))  return OPERATOR_MOD;
     if (!strcmp(t.text, "="))  return OPERATOR_ASSIGN;
     if (!strcmp(t.text, "*"))  return OPERATOR_MULTIPLY;
     if (!strcmp(t.text, "&&")) return OPERATOR_LOGICAL_AND;
@@ -315,6 +315,7 @@ Node* ledBinaryLeft(Parser *p, Node *left) //build new left, starts on right of 
     Node *op = malloc(sizeof(Node));
 
     op->type = NODE_OPERATOR;
+    op->operator.opType = opType;
     op->operator.lbp = rules[opType].operator.lbp; //save for print
     int rbp = rules[opType].operator.lbp; 
 
@@ -335,6 +336,7 @@ Node* ledBinaryRight(Parser *p, Node *left) //right assoc version
     Node *op = malloc(sizeof(Node));
 
     op->type = NODE_OPERATOR;
+    op->operator.opType = opType;
     op->operator.lbp = rules[opType].operator.lbp; 
     int rbp = rules[opType].operator.lbp - 1; 
 

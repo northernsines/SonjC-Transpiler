@@ -1,8 +1,14 @@
+# ignore compiled binary (STUB, ADD PROPER BUILD FOLDER FOR BINARIES)
 transpiler
+# ignore test source files
 test_*.sc
+# ignore LLDB debug symbols
 *.dSYM
-transpiler.dSYM
+# ignore macOS config settings
 .DS_STORE
+# ignore Windows config settings
 Thumbs.db
+# ignore markdown files
 *.md
-/vscode
+# ignore vscode config settings
+.vscode/*

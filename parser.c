@@ -269,8 +269,16 @@ OperatorType lookupOperator(Token t)
     if (!strcmp(t.text, "/"))  return OPERATOR_DIVIDE;
     if (!strcmp(t.text, "%"))  return OPERATOR_MOD;
     if (!strcmp(t.text, "="))  return OPERATOR_ASSIGN;
-    if (!strcmp(t.text, "*"))  return OPERATOR_MULTIPLY;
     if (!strcmp(t.text, "&&")) return OPERATOR_LOGICAL_AND;
+    if (!strcmp(t.text, "||")) return OPERATOR_LOGICAL_OR;
+    if (!strcmp(t.text, "&")) return OPERATOR_BITWISE_AND;
+    if (!strcmp(t.text, "|")) return OPERATOR_BITWISE_OR;
+    if (!strcmp(t.text, "^")) return OPERATOR_BITWISE_XOR;
+    if (!strcmp(t.text, "==")) return OPERATOR_IS_EQUAL;
+    if (!strcmp(t.text, "!=")) return OPERATOR_IS_NOT_EQUAL;
+    if (!strcmp(t.text, "++")) return OPERATOR_INCREMENT;
+    if (!strcmp(t.text, "--")) return OPERATOR_DECREMENT;
+    if (!strcmp(t.text, "sizeof")) return OPERATOR_SIZEOF;
     if (!strcmp(t.text, "!")) return OPERATOR_LOGICAL_NOT;
     if (!strcmp(t.text, "~")) return OPERATOR_BITWISE_NOT;
     //STUB, add more operators
@@ -278,12 +286,31 @@ OperatorType lookupOperator(Token t)
     return OPERATOR_NONE;
 }
 
-Node* nudUnary(Parser *p)
+Node* nudUnary(Parser *p) //build unary expression with prefix operator
+{
+    Node *exp = malloc(sizeof(Node));
+
+    Token opToken = CUR(p);
+    OperatorType opType = lookupOperator(opToken); //get operator type of current operator
+    Node *op = malloc(sizeof(Node));
+
+    op->type = NODE_OPERATOR;
+    op->operator.opType = opType;
+    int rbp = rules[opType].operator.lbp - 1; //prefix unary is always right assoc
+
+    exp->type = NODE_UNARY_EXPR;
+    exp->unaryExpr.operator = op;
+    exp->unaryExpr.exp = parseExpression(p, rbp);
+
+    return exp;
+}
+
+Node* nudAddress(Parser *p)
 {
     //STUB
 }
 
-Node* nudPrimary(Parser *p) //build literal or var node from previous token
+Node* nudPrimary(Parser *p) //build literal or var node from current token
 {
     Token tok = CUR(p);
 
@@ -301,9 +328,9 @@ Node* nudPrimary(Parser *p) //build literal or var node from previous token
     return node;
 }
 
-Node* ledUnary(Parser *p, Node *left)
+Node* ledUnary(Parser *p, Node *left) //build unary expressionw ith postfix operator
 {
-    //STUB
+
 }
 
 Node* ledBinaryLeft(Parser *p, Node *left) //build new left, starts on right of op, creates binary expression with left, operator, right
@@ -316,7 +343,6 @@ Node* ledBinaryLeft(Parser *p, Node *left) //build new left, starts on right of 
 
     op->type = NODE_OPERATOR;
     op->operator.opType = opType;
-    op->operator.lbp = rules[opType].operator.lbp; //save for print
     int rbp = rules[opType].operator.lbp; 
 
     exp->type = NODE_BINARY_EXPR;
@@ -337,7 +363,6 @@ Node* ledBinaryRight(Parser *p, Node *left) //right assoc version
 
     op->type = NODE_OPERATOR;
     op->operator.opType = opType;
-    op->operator.lbp = rules[opType].operator.lbp; 
     int rbp = rules[opType].operator.lbp - 1; 
 
     exp->type = NODE_BINARY_EXPR;
@@ -367,10 +392,64 @@ void initRules(void) // building the operator table
         }
     };
 
+    rules[OPERATOR_LOGICAL_OR] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 40,
+            .nud = NULL,
+            .led = ledBinaryLeft
+        }
+    };
+
     rules[OPERATOR_LOGICAL_AND] = (Node){
         .type = NODE_OPERATOR,
         .operator = {
             .lbp = 50,
+            .nud = NULL,
+            .led = ledBinaryLeft
+        }
+    };
+
+    rules[OPERATOR_BITWISE_OR] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 60,
+            .nud = NULL,
+            .led = ledBinaryLeft
+        }
+    };
+
+    rules[OPERATOR_BITWISE_XOR] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 70,
+            .nud = NULL,
+            .led = ledBinaryLeft
+        }
+    };
+
+    rules[OPERATOR_BITWISE_AND] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 80,
+            .nud = nudAddress,
+            .led = ledBinaryLeft
+        }
+    };
+
+    rules[OPERATOR_IS_EQUAL] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 90,
+            .nud = NULL,
+            .led = ledBinaryLeft
+        }
+    };
+
+    rules[OPERATOR_IS_NOT_EQUAL] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 90,
             .nud = NULL,
             .led = ledBinaryLeft
         }
@@ -465,7 +544,7 @@ Node *parseExpression(Parser *p, int rbp) //parses the actual stream of expressi
     Token tok = CUR(p);
     OperatorType opType = lookupOperator(tok); // maps Token -> OperatorType
 
-    Node *left = malloc(sizeof(Node));
+    Node *left = NULL; //no allocation because pointer gets overriden
     if (opType != OPERATOR_NONE && rules[opType].operator.nud != NULL) //consume operator
     {
         skip(p, "advancing past prefix/nud token");

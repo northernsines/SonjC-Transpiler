@@ -41,7 +41,6 @@ typedef struct {
     char currentText[300];
 } Lexer;
 
-char *tokentypeToString(TokenType type);
 Token nextToken(Lexer *lexer); 
 
 #endif

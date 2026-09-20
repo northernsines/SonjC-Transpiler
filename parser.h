@@ -263,10 +263,25 @@ typedef struct Node{
 
 
 //neccessary function declerations
-Token consume(Parser *p, TokenType expectedType, const char *expectedText, const char *context);
-void skip(Parser *p, const char *context);
 Node *parse(Parser *p);
 
+//utility functions (implemented in parser_utils.c)
+void parserError(const char *message, ...);
+bool isTypeName(Token *t);
+const char *tokenTypeName(TokenType t);
+Token consume(Parser *p, TokenType expectedType, const char *expectedText, const char *context);
+void skip(Parser *p, const char *context);
+int pow10(int num);
+OperatorType lookupOperator(Token t);
+
 //operator rule table
+extern Node rules[60];
 void initRules(void);
+
+//parsing functions referenced by initRules (implemented in parser.c)
+Node* nudUnary(Parser *p);
+Node* nudAddress(Parser *p);
+Node* ledUnary(Parser *p, Node *left);
+Node* ledBinaryLeft(Parser *p, Node *left);
+Node* ledBinaryRight(Parser *p, Node *left);
 #endif

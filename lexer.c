@@ -624,20 +624,3 @@ Token nextToken(Lexer *lexer)
         .type = currentType
     };
 }
-
-char *tokentypeToString(TokenType type)
-{
-    return
-        type == TOKEN_KEYWORD ? "KEYW" :
-        type == TOKEN_IDENTIFIER ? "IDEN" :
-        type == TOKEN_PUNCTUATION ? "PUNC" :
-        type == TOKEN_OPERATOR ? "OPER" :
-        type == TOKEN_STRING ? "STRN" :
-        type == TOKEN_INTEGER ? "INTG" :
-        type == TOKEN_FLOAT ? "FLOT" :
-        type == TOKEN_FIXED ? "FIXD" :
-        type == TOKEN_DIRECTIVE ? "DIRV":
-        type == TOKEN_NONE ? "NONE":
-        type == TOKEN_EOF ? "EOFL":
-        type == TOKEN_CHAR ? "CHAR" : "UKWN";
-}

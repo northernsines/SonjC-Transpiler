@@ -237,8 +237,8 @@ typedef struct Node{
     (CUR(p).type == TOKEN_KEYWORD && (!strcmp(CUR(p).text, "true") || !strcmp(CUR(p).text, "false"))) \
 )
 
-#define PREV_PUNCT(p, s)     (PREV(p).type == TOKEN_PUNCTUATION && !strcmp(CUR(p).text, (s)))
-#define PREV_KEYWORD(p, s)   (PREV(p).type == TOKEN_KEYWORD && !strcmp(CUR(p).text, (s)))
+#define PREV_PUNCT(p, s)     (PREV(p).type == TOKEN_PUNCTUATION && !strcmp(PREV(p).text, (s)))
+#define PREV_KEYWORD(p, s)   (PREV(p).type == TOKEN_KEYWORD && !strcmp(PREV(p).text, (s)))
 #define PREV_IDENTIFIER(p)   (PREV(p).type == TOKEN_IDENTIFIER)
 #define PREV_LITERAL(p) ( \
     PREV(p).type == TOKEN_INTEGER || \
@@ -249,9 +249,9 @@ typedef struct Node{
     (PREV(p).type == TOKEN_KEYWORD && (!strcmp(PREV(p).text, "true") || !strcmp(PREV(p).text, "false"))) \
 )
 
-#define NEXT_PUNCT(p, s)     (PREV(p).type == TOKEN_PUNCTUATION && !strcmp(CUR(p).text, (s)))
-#define NEXT_KEYWORD(p, s)   (PREV(p).type == TOKEN_KEYWORD && !strcmp(CUR(p).text, (s)))
-#define NEXT_IDENTIFIER(p)   (PREV(p).type == TOKEN_IDENTIFIER)
+#define NEXT_PUNCT(p, s)     (NEXT(p).type == TOKEN_PUNCTUATION && !strcmp(NEXT(p).text, (s)))
+#define NEXT_KEYWORD(p, s)   (NEXT(p).type == TOKEN_KEYWORD && !strcmp(NEXT(p).text, (s)))
+#define NEXT_IDENTIFIER(p)   (NEXT(p).type == TOKEN_IDENTIFIER)
 
 #define IS_OPEN_PAREN(p)     IS_PUNCT(p, "(")
 #define IS_CLOSE_PAREN(p)    IS_PUNCT(p, ")")

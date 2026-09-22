@@ -2,5 +2,5 @@ import io;
 
 main()
 {
-    x = 5 + 5;
+    print("hello world");
 }

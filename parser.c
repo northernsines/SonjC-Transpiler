@@ -25,7 +25,7 @@ Node *handleLiteral(Parser *p)
         case TOKEN_KEYWORD: literal->type = NODE_BOOL_LITERAL;   break;
         default: parserError("Expected literal in literal slot at position %d", p->pos);
     }
-    char* str = malloc(sizeof(t.text));
+    char* str = malloc(strlen(t.text) + 1);
     if (str == NULL) parserError("malloc for string literal allocation returned null");
     strcpy(str, t.text);
     int strSize = strlen(str);
@@ -82,7 +82,7 @@ Node *handleLiteral(Parser *p)
     }
     else if(literal->type == NODE_STRING_LITERAL)
     {
-        strcpy(literal->stringLiteral.value, str);
+       literal->stringLiteral.value = str;
     }
     else if(literal->type == NODE_BOOL_LITERAL)
     {
@@ -136,9 +136,9 @@ Node *handleParam(Parser *p, bool decleration)
     }
 }
 
-Node **handleArgList(Parser *p, bool decleration, int *outCount)
+Node **handleArgList(Parser *p, bool decleration, int *outCount) //starts on function name
 {
-   int paramCap = 8;
+    int paramCap = 8;
     Node **params = malloc(sizeof(Node*) * paramCap);
     int paramCount = 0;
 
@@ -166,11 +166,24 @@ Node **handleArgList(Parser *p, bool decleration, int *outCount)
     return params;
 }
 
+Node* handleCallExp(Parser *p)
+{
+    Node *exp = malloc(sizeof(Node));
+
+    exp->type = NODE_CALL_EXPR;
+    exp->callExpr.name = (CUR(p)).text;
+    int argCount;
+    exp->callExpr.args = handleArgList(p, false, &argCount);
+    exp->callExpr.argCount = argCount;
+    skip(p, "skipping final ) of arg list");
+    return exp;
+}
+
 Node* nudUnary(Parser *p) //build unary expression with prefix operator
 {
     Node *exp = malloc(sizeof(Node));
 
-    Token opToken = CUR(p);
+    Token opToken = PREV(p); //prefix token was already skipped by parseExpression
     OperatorType opType = lookupOperator(opToken); //get operator type of current operator
     Node *op = malloc(sizeof(Node));
 
@@ -199,7 +212,11 @@ Node* nudPrimary(Parser *p) //build literal or var node from current token
     {
         node = handleLiteral(p);
     }
-    else // identifier
+    else if (NEXT_PUNCT(p, "(")) //call expression
+    {
+        node = handleCallExp(p);
+    }
+    else // variable
     {
         node->type = NODE_VAR;
         node->var.name = tok.text;
@@ -208,7 +225,7 @@ Node* nudPrimary(Parser *p) //build literal or var node from current token
     return node;
 }
 
-Node* ledUnary(Parser *p, Node *left) //build unary expressionw ith postfix operator
+Node* ledUnary(Parser *p, Node *left) //build unary expression with postfix operator
 {
 
 }

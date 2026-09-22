@@ -132,12 +132,17 @@ void printNode(Node *node, int depth)
             printNode(node->binaryExpr.rightExp, depth + 1);
             break;
 
+        case NODE_UNARY_EXPR:
+            printf("unaryExp: %s\n", operatorTypeToString(node->unaryExpr.operator->operator.opType));
+            printNode(node->unaryExpr.exp, depth + 1);
+            break;
+
         case NODE_CALL_EXPR:
             printf("CallExpr: %s\n", node->callExpr.name);
             for (int i = 0; i < node->callExpr.argCount; i++)
                 printNode(node->callExpr.args[i], depth + 1);
             break;
-
+            
         case NODE_EXPR_STMT:
             printf("ExprStmt\n");
             printNode(node->exprStmt.expr, depth + 1);

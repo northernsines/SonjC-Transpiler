@@ -19,6 +19,7 @@ typedef enum {
     NODE_UNARY_EXPR,
     NODE_BINARY_EXPR,
     NODE_TERNARY_EXPR,
+    NODE_CAST,
     NODE_VAR,
     NODE_INT_LITERAL,
     NODE_FLOAT_LITERAL,
@@ -215,6 +216,11 @@ typedef struct Node{
             struct Node *ifTrueExp;
             struct Node *ifFalseExp;
         } ternaryExpr;
+
+        struct {
+            char* type;
+            struct Node *exp;
+        } cast;
         //STUB add all nodes
     };
 } Node;
@@ -280,6 +286,7 @@ void initRules(void);
 
 //parsing functions referenced by initRules (implemented in parser.c)
 Node* nudUnary(Parser *p);
+Node* nudCast(Parser *p);
 Node* nudAddress(Parser *p);
 Node* ledUnary(Parser *p, Node *left);
 Node* ledBinaryLeft(Parser *p, Node *left);

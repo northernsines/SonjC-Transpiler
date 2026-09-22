@@ -89,7 +89,8 @@ void printNode(Node *node, int depth)
 {
     if (!node) return;
 
-    for (int i = 0; i < depth; i++) printf("  "); // indent per depth
+    for (int i = 0; i < depth; i++) printf("____"); // indent per depth
+    printf("|"); //marker
 
     switch (node->type)
     {
@@ -142,7 +143,12 @@ void printNode(Node *node, int depth)
             for (int i = 0; i < node->callExpr.argCount; i++)
                 printNode(node->callExpr.args[i], depth + 1);
             break;
-            
+
+        case NODE_CAST:
+            printf("Cast: %s\n", node->cast.type);
+            printNode(node->cast.exp, depth + 1);
+            break;
+
         case NODE_EXPR_STMT:
             printf("ExprStmt\n");
             printNode(node->exprStmt.expr, depth + 1);
@@ -160,7 +166,8 @@ void printNode(Node *node, int depth)
                    node->functionDecl.returnType);
             if (node->functionDecl.paramCount == 0)
             {
-                for (int i = 0; i < depth + 1; i++) printf("  ");
+                for (int i = 0; i < depth + 1; i++) printf("____");
+                printf("|");
                 printf("void\n");
             }
             else
@@ -175,7 +182,8 @@ void printNode(Node *node, int depth)
             printf("Program\n");
             for (int i = 0; i < node->program.importCount; i++)
             {
-                for (int j = 0; j < depth + 1; j++) printf("  ");
+                for (int j = 0; j < depth + 1; j++) printf("____");
+                printf("|");
                 printf("Import: %s\n", node->program.imports[i]);
             }
             for (int i = 0; i < node->program.functionCount; i++)

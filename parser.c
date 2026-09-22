@@ -179,6 +179,18 @@ Node* handleCallExp(Parser *p)
     return exp;
 }
 
+Node* nudCast(Parser *p)
+{
+    Node *castExp = malloc(sizeof(Node));
+
+    castExp->type = NODE_CAST;
+    castExp->cast.type = CUR(p).text;
+    skip(p, "skipping type of cast");
+    skip(p, "skipping ) of cast");
+    castExp->cast.exp = parseExpression(p, 139);
+    return castExp;
+}
+
 Node* nudUnary(Parser *p) //build unary expression with prefix operator
 {
     Node *exp = malloc(sizeof(Node));

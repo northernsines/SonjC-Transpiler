@@ -104,6 +104,7 @@ OperatorType lookupOperator(Token t)
     if (!strcmp(t.text, "&&")) return OPERATOR_LOGICAL_AND;
     if (!strcmp(t.text, "||")) return OPERATOR_LOGICAL_OR;
     if (!strcmp(t.text, "&")) return OPERATOR_BITWISE_AND;
+    if (!strcmp(t.text, "(")) return OPERATOR_CAST;
     if (!strcmp(t.text, "|")) return OPERATOR_BITWISE_OR;
     if (!strcmp(t.text, "^")) return OPERATOR_BITWISE_XOR;
     if (!strcmp(t.text, "==")) return OPERATOR_IS_EQUAL;
@@ -233,6 +234,15 @@ void initRules(void) // building the operator table
             .lbp = 130,
             .nud = NULL,
             .led = ledBinaryLeft
+        }
+    };
+
+    rules[OPERATOR_CAST] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 140,
+            .nud = nudCast,
+            .led = ledUnary,
         }
     };
 

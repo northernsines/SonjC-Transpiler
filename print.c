@@ -81,11 +81,12 @@ const char *operatorTypeToString(OperatorType op)
         case OPERATOR_BRACKET:              return "[]";
         case OPERATOR_DOT:                  return ".";
         case OPERATOR_ARROW:                return "->";
+        //STUB add more operators
     }
     return "unknown";
 }
 
-void printNode(Node *node, int depth)
+void printNode(Node *node, int depth) //STUB implement all nodes
 {
     if (!node) return;
 

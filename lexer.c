@@ -42,7 +42,7 @@ bool isNumber(char currentChar)
     return ('0' <= currentChar && currentChar <= '9');
 }
 
-bool isKeyword(char *text)
+bool isKeyword(char *text) //STUB add all keywords
 {
     return
         // standard C types/qualifiers
@@ -100,7 +100,7 @@ bool isKeyword(char *text)
         !strcmp(text, "private");
 }
 
-bool isOperator (char currentChar) //list of operators
+bool isOperator (char currentChar) //STUB add all operators
 {
     return
         currentChar == '+' ||
@@ -121,7 +121,7 @@ bool isOperator (char currentChar) //list of operators
         currentChar == '.';
 }
 
-bool isMulticharOperator(char *text)
+bool isMulticharOperator(char *text) //STUB add all multichar operators
 {
     return
         // string operators (SonjC)
@@ -153,7 +153,7 @@ bool isMulticharOperator(char *text)
         !strcmp(text, "|=");
 }
 
-bool isPunctuation (char currentChar) //list of punctuation
+bool isPunctuation (char currentChar) //STUBB add all list of punctuation
 {
     return
         currentChar == '{' ||

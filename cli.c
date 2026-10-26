@@ -32,7 +32,7 @@ CliOptions parseArgs(int argc, char *argv[])
     }
 
     if (argc < 2) {
-        fprintf(stderr, "usage: %s [-printtok] [-printast] [-help] <file.sc>\n", argv[0]);
+        fprintf(stderr, "usage: %s [-flags] <file.sc>\n\nUse the \"-help\" flag to show a list of flags.\n\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 

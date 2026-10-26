@@ -420,7 +420,7 @@ Node *handleFunction(Parser *p)
     return function;
 }
 
-Node *parse(Parser *p)
+Node *parse(Parser *p) //STUB: ADD PREPROCESSOR DIRECTIVES | main parsing loop
 {
     int scope = 0;
 
@@ -440,19 +440,19 @@ Node *parse(Parser *p)
             p->pos > 0 &&
             p->tokens[p->pos - 1].type == TOKEN_KEYWORD &&
             IS_IDENTIFIER(p) &&
-            !strcmp(p->tokens[p->pos - 1].text, "import");
+            !strcmp(p->tokens[p->pos - 1].text, "import"); //test for import with import keyword at top level
         bool isFunction =
             scope == 0 &&
             p->pos > 0 &&
             IS_IDENTIFIER(p) &&
             p->tokens[p->pos + 1].type == TOKEN_PUNCTUATION &&
-            !strcmp(p->tokens[p->pos + 1].text, "(");
+            !strcmp(p->tokens[p->pos + 1].text, "("); //Maybe stub? test for functions wth identifier plus ( at top level
         bool isGlobal =
             scope == 0 &&
             p->pos > 0 &&
             p->tokens[p->pos - 1].type == TOKEN_KEYWORD &&
             IS_IDENTIFIER(p) &&
-            strcmp(p->tokens[p->pos - 1].text, "import");
+            strcmp(p->tokens[p->pos - 1].text, "import"); //Maybe stub? test for global with keyword at top level but NOT import
 
         if (IS_OPEN_BRACE(p)) scope++;
         if (IS_CLOSE_BRACE(p)) scope--;

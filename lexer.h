@@ -19,7 +19,6 @@ typedef enum {
     TOKEN_FIXED,
     TOKEN_CHAR,
     TOKEN_OPERATOR,
-    TOKEN_DIRECTIVE,
     TOKEN_EOF
 } TokenType;
 

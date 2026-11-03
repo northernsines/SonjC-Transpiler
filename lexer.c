@@ -81,7 +81,6 @@ bool isKeyword(char *text) //STUB add all keywords
         !strcmp(text, "label") ||
         // standard C type/struct related
         !strcmp(text, "enum") ||
-        !strcmp(text, "struct") ||
         !strcmp(text, "union") ||
         !strcmp(text, "typedef") ||
         !strcmp(text, "sizeof") ||
@@ -93,10 +92,13 @@ bool isKeyword(char *text) //STUB add all keywords
         !strcmp(text, "elif") ||
         !strcmp(text, "fixed") ||
         !strcmp(text, "iterate") ||
-        !strcmp(text, "string") ||
+        !strcmp(text, "repeat") ||
+        !strcmp(text, "until") ||
+        !strcmp(text, "forever") ||
         !strcmp(text, "object") ||
-        !strcmp(text, "public") ||
         !strcmp(text, "import") ||
+        !strcmp(text, "namespace") ||
+        !strcmp(text, "public") ||
         !strcmp(text, "private");
 }
 
@@ -455,25 +457,6 @@ Token handlePunctuationOperatorNumber(Lexer *lexer, int *currentSize, TokenType 
     return (Token){0};
 }
 
-Token handleDirective(Lexer *lexer, int *currentSize, TokenType *currentType)
-{
-    *currentType = TOKEN_DIRECTIVE;
-    char currentChar = lexer->source[lexer->pos];
-    while (currentChar != '\n') //start at # and lex everything from then to newline as pp directive
-    {
-        if(currentChar == '\0') return returnEOF(lexer);
-        lexer->currentText[*currentSize] = currentChar;
-        advance(lexer);
-        (*currentSize)++;
-        currentChar = lexer->source[lexer->pos];
-    }
-    return (Token){
-    .length = *currentSize,
-    .text = lexer->currentText,
-    .type = *currentType
-    };
-}
-
 Token handleIdentifier(Lexer *lexer, int *currentSize, TokenType *currentType)
 {
     char currentChar = lexer->source[lexer->pos];
@@ -560,11 +543,6 @@ Token nextToken(Lexer *lexer)
         }
     }
     //handle preprocessor directives
-    if(currentChar == '#')
-    {
-        Token tok = handleDirective(lexer, &currentSize, &currentType);
-            return tok;
-    }
 
     //skip comments
     int commentResult = skipComment(lexer);

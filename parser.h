@@ -28,6 +28,7 @@ typedef enum {
     NODE_STRING_LITERAL,
     NODE_OPERATOR,
     NODE_IF_STMT,
+    NODE_ELSE_STMT,
     NODE_SWITCH_STMT,
     NODE_WHILE_STMT,
     NODE_DO_WHILE_STMT,
@@ -39,6 +40,8 @@ typedef enum {
     NODE_GOTO_STMT,
     NODE_LABEL_STMT,
     NODE_INSTANCE_DECL,
+    NODE_MEMBER_EXPR,
+    NODE_INDEX_EXPR,
     NODE_BOOL_LITERAL
     //STUB, confirm all possible nodes added
 } NodeType;
@@ -78,7 +81,7 @@ typedef enum {
     OPERATOR_LESS_THAN_OREQ,
     OPERATOR_GREATER_THAN_OREQ,
     //shift
-    OPERATOR_SHIFT_LOW,
+    OPERATOR_SHIFT_LEFT,
     OPERATOR_SHIFT_RIGHT,
     //additive
     OPERATOR_ADD,
@@ -96,7 +99,6 @@ typedef enum {
     //postfix
     OPERATOR_INCREMENT,
     OPERATOR_DECREMENT,
-    OPERATOR_PARENTHESIS,
     OPERATOR_BRACKET,
     OPERATOR_DOT,
     OPERATOR_ARROW
@@ -158,11 +160,32 @@ typedef struct Node{
             struct Node *expr;
         } exprStmt;
 
+        struct { // expression statement
+            struct Node *expr;
+            struct Node *logic; //block OR statement direct
+            struct Node *elseStmt;
+        } ifStmt;
+
+        struct { // expression statement
+            struct Node *logic; //block OR statement direct
+        } elseStmt;
+
         struct { // call expression
-            char *name;
+            struct Node *callee;
             struct Node **args;
             int argCount;
         } callExpr;
+
+        struct { // member access (. or ->)
+            struct Node *object;
+            char *member;
+            bool isArrow;
+        } memberExpr;
+
+        struct { // index expression
+            struct Node *target;
+            struct Node *index;
+        } indexExpr;
 
         struct { // variable reference
             char *name;
@@ -267,7 +290,6 @@ typedef struct Node{
 #define IS_SEMICOLON(p)      IS_PUNCT(p, ";")
 #define IS_VOID_KW(p)        IS_KEYWORD(p, "void")
 
-
 //neccessary function declerations
 Node *parse(Parser *p);
 
@@ -284,11 +306,16 @@ OperatorType lookupOperator(Token t);
 extern Node rules[60];
 void initRules(void);
 
-//parsing functions referenced by initRules (implemented in parser.c)
+//pratt parsing functions referenced by initRules (implemented in parser.c)
 Node* nudUnary(Parser *p);
 Node* nudCast(Parser *p);
+Node* nudParen(Parser *p);
 Node* nudAddress(Parser *p);
 Node* ledUnary(Parser *p, Node *left);
 Node* ledBinaryLeft(Parser *p, Node *left);
 Node* ledBinaryRight(Parser *p, Node *left);
+Node* ledCall(Parser *p, Node *left);
+Node* ledTernary(Parser *p, Node *left);
+Node* ledMember(Parser *p, Node *left);
+Node* ledIndex(Parser *p, Node *left);
 #endif

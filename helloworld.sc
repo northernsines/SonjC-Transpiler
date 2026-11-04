@@ -2,5 +2,7 @@ import io;
 
 main()
 {
-    print("hello world");
+    int condition;
+    if(condition) print("hello world");
+    else print("goodbye world");
 }

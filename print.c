@@ -28,7 +28,6 @@ const char *tokentypeToString(TokenType type)
         type == TOKEN_INTEGER ? "INTG" :
         type == TOKEN_FLOAT ? "FLOT" :
         type == TOKEN_FIXED ? "FIXD" :
-        type == TOKEN_DIRECTIVE ? "DIRV":
         type == TOKEN_NONE ? "NONE":
         type == TOKEN_EOF ? "EOFL":
         type == TOKEN_CHAR ? "CHAR" : "UKWN";
@@ -64,7 +63,7 @@ const char *operatorTypeToString(OperatorType op)
         case OPERATOR_LESS_THAN:            return "<";
         case OPERATOR_LESS_THAN_OREQ:       return "<=";
         case OPERATOR_GREATER_THAN_OREQ:    return ">=";
-        case OPERATOR_SHIFT_LOW:            return "<<";
+        case OPERATOR_SHIFT_LEFT:           return "<<";
         case OPERATOR_SHIFT_RIGHT:          return ">>";
         case OPERATOR_ADD:                  return "+";
         case OPERATOR_SUBTRACT:             return "-";
@@ -77,7 +76,6 @@ const char *operatorTypeToString(OperatorType op)
         case OPERATOR_SIZEOF:               return "sizeof";
         case OPERATOR_INCREMENT:            return "++";
         case OPERATOR_DECREMENT:            return "--";
-        case OPERATOR_PARENTHESIS:          return "()";
         case OPERATOR_BRACKET:              return "[]";
         case OPERATOR_DOT:                  return ".";
         case OPERATOR_ARROW:                return "->";
@@ -140,9 +138,28 @@ void printNode(Node *node, int depth) //STUB implement all nodes
             break;
 
         case NODE_CALL_EXPR:
-            printf("CallExpr: %s\n", node->callExpr.name);
+            printf("CallExpr\n");
+            printNode(node->callExpr.callee, depth + 1);
             for (int i = 0; i < node->callExpr.argCount; i++)
                 printNode(node->callExpr.args[i], depth + 1);
+            break;
+
+        case NODE_MEMBER_EXPR:
+            printf("Member: %s%s\n", node->memberExpr.isArrow ? "->" : ".", node->memberExpr.member);
+            printNode(node->memberExpr.object, depth + 1);
+            break;
+
+        case NODE_INDEX_EXPR:
+            printf("Index\n");
+            printNode(node->indexExpr.target, depth + 1);
+            printNode(node->indexExpr.index, depth + 1);
+            break;
+
+        case NODE_TERNARY_EXPR:
+            printf("Ternary: ?:\n");
+            printNode(node->ternaryExpr.conditionExp, depth + 1);
+            printNode(node->ternaryExpr.ifTrueExp, depth + 1);
+            printNode(node->ternaryExpr.ifFalseExp, depth + 1);
             break;
 
         case NODE_CAST:
@@ -153,6 +170,18 @@ void printNode(Node *node, int depth) //STUB implement all nodes
         case NODE_EXPR_STMT:
             printf("ExprStmt\n");
             printNode(node->exprStmt.expr, depth + 1);
+            break;
+
+        case NODE_IF_STMT:
+            printf("IfStmt\n");
+            printNode(node->ifStmt.expr, depth + 1);
+            printNode(node->ifStmt.logic, depth + 1);
+            if(!(node->ifStmt.elseStmt == NULL)) printNode(node->ifStmt.elseStmt, depth + 1);
+            break;
+        
+        case NODE_ELSE_STMT:
+            printf("ElseStmt\n");
+            printNode(node->elseStmt.logic, depth + 1);
             break;
 
         case NODE_BLOCK:

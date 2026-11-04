@@ -32,10 +32,17 @@ bool isTypeName(Token *t)
     bool returnBool =
     !strcmp(t->text, "int") ||
     !strcmp(t->text, "float") ||
+    !strcmp(t->text, "double") ||
     !strcmp(t->text, "char") ||
     !strcmp(t->text, "bool") ||
     !strcmp(t->text, "string") ||
-    !strcmp(t->text, "size_t");
+    !strcmp(t->text, "size_t") ||
+    !strcmp(t->text, "void") ||
+    !strcmp(t->text, "short") ||
+    !strcmp(t->text, "long") ||
+    !strcmp(t->text, "signed") ||
+    !strcmp(t->text, "unsigned") ||
+    !strcmp(t->text, "fixed");
     return returnBool;
 }
 
@@ -95,12 +102,24 @@ OperatorType lookupOperator(Token t)
     return OPERATOR_NONE;
 
     if (!strcmp(t.text, ";") || !strcmp(t.text, "{"))  return OPERATOR_END_EXP;
+    if (!strcmp(t.text, ","))  return OPERATOR_COMMA;
     if (!strcmp(t.text, "+"))  return OPERATOR_ADD;
     if (!strcmp(t.text, "-"))  return OPERATOR_SUBTRACT;
     if (!strcmp(t.text, "*"))  return OPERATOR_MULTIPLY;
     if (!strcmp(t.text, "/"))  return OPERATOR_DIVIDE;
     if (!strcmp(t.text, "%"))  return OPERATOR_MOD;
     if (!strcmp(t.text, "="))  return OPERATOR_ASSIGN;
+    if (!strcmp(t.text, "+=")) return OPERATOR_ASSIGN_ADD;
+    if (!strcmp(t.text, "-=")) return OPERATOR_ASSIGN_SUBTRACT;
+    if (!strcmp(t.text, "*=")) return OPERATOR_ASSIGN_MULTIPLY;
+    if (!strcmp(t.text, "/=")) return OPERATOR_ASSIGN_DIVIDE;
+    if (!strcmp(t.text, "%=")) return OPERATOR_ASSIGN_MOD;
+    if (!strcmp(t.text, "&=")) return OPERATOR_BITWISE_ASSIGN_AND;
+    if (!strcmp(t.text, "|=")) return OPERATOR_BITWISE_ASSIGN_OR;
+    if (!strcmp(t.text, "^=")) return OPERATOR_BITWISE_ASSIGN_XOR;
+    if (!strcmp(t.text, "<<=")) return OPERATOR_BITWISE_ASSIGN_LEFTSHIFT;
+    if (!strcmp(t.text, ">>=")) return OPERATOR_BITWISE_ASSIGN_RIGHTSHIFT;
+    if (!strcmp(t.text, "?")) return OPERATOR_TERNARY;
     if (!strcmp(t.text, "&&")) return OPERATOR_LOGICAL_AND;
     if (!strcmp(t.text, "||")) return OPERATOR_LOGICAL_OR;
     if (!strcmp(t.text, "&")) return OPERATOR_BITWISE_AND;
@@ -109,11 +128,20 @@ OperatorType lookupOperator(Token t)
     if (!strcmp(t.text, "^")) return OPERATOR_BITWISE_XOR;
     if (!strcmp(t.text, "==")) return OPERATOR_IS_EQUAL;
     if (!strcmp(t.text, "!=")) return OPERATOR_IS_NOT_EQUAL;
+    if (!strcmp(t.text, ">")) return OPERATOR_GREATER_THAN;
+    if (!strcmp(t.text, "<")) return OPERATOR_LESS_THAN;
+    if (!strcmp(t.text, ">=")) return OPERATOR_GREATER_THAN_OREQ;
+    if (!strcmp(t.text, "<=")) return OPERATOR_LESS_THAN_OREQ;
+    if (!strcmp(t.text, "<<")) return OPERATOR_SHIFT_LEFT;
+    if (!strcmp(t.text, ">>")) return OPERATOR_SHIFT_RIGHT;    
     if (!strcmp(t.text, "++")) return OPERATOR_INCREMENT;
     if (!strcmp(t.text, "--")) return OPERATOR_DECREMENT;
     if (!strcmp(t.text, "sizeof")) return OPERATOR_SIZEOF;
     if (!strcmp(t.text, "!")) return OPERATOR_LOGICAL_NOT;
     if (!strcmp(t.text, "~")) return OPERATOR_BITWISE_NOT;
+    if (!strcmp(t.text, "[")) return OPERATOR_BRACKET;
+    if (!strcmp(t.text, ".")) return OPERATOR_DOT;
+    if (!strcmp(t.text, "->")) return OPERATOR_ARROW;
     //STUB, add more operators
 
     return OPERATOR_NONE;
@@ -129,12 +157,120 @@ void initRules(void) // building the operator table
         }
     };
 
+    rules[OPERATOR_COMMA] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 10,
+            .nud = NULL,
+            .led = ledBinaryLeft
+        }
+    };
+
     rules[OPERATOR_ASSIGN] = (Node){
         .type = NODE_OPERATOR,
         .operator = {
             .lbp = 20,
             .nud = NULL,
             .led = ledBinaryRight
+        }
+    };
+
+    rules[OPERATOR_ASSIGN_ADD] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 20,
+            .nud = NULL,
+            .led = ledBinaryRight
+        }
+    };
+
+    rules[OPERATOR_ASSIGN_SUBTRACT] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 20,
+            .nud = NULL,
+            .led = ledBinaryRight
+        }
+    };
+
+    rules[OPERATOR_ASSIGN_MULTIPLY] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 20,
+            .nud = NULL,
+            .led = ledBinaryRight
+        }
+    };
+
+    rules[OPERATOR_ASSIGN_DIVIDE] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 20,
+            .nud = NULL,
+            .led = ledBinaryRight
+        }
+    };
+
+    rules[OPERATOR_ASSIGN_MOD] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 20,
+            .nud = NULL,
+            .led = ledBinaryRight
+        }
+    };
+
+    rules[OPERATOR_BITWISE_ASSIGN_AND] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 20,
+            .nud = NULL,
+            .led = ledBinaryRight
+        }
+    };
+
+    rules[OPERATOR_BITWISE_ASSIGN_OR] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 20,
+            .nud = NULL,
+            .led = ledBinaryRight
+        }
+    };
+
+    rules[OPERATOR_BITWISE_ASSIGN_XOR] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 20,
+            .nud = NULL,
+            .led = ledBinaryRight
+        }
+    };
+
+    rules[OPERATOR_BITWISE_ASSIGN_LEFTSHIFT] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 20,
+            .nud = NULL,
+            .led = ledBinaryRight
+        }
+    };
+
+    rules[OPERATOR_BITWISE_ASSIGN_RIGHTSHIFT] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 20,
+            .nud = NULL,
+            .led = ledBinaryRight
+        }
+    };
+
+    rules[OPERATOR_TERNARY] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 30,
+            .nud = NULL,
+            .led = ledTernary
         }
     };
 
@@ -201,6 +337,60 @@ void initRules(void) // building the operator table
         }
     };
 
+    rules[OPERATOR_GREATER_THAN] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 100,
+            .nud = NULL,
+            .led = ledBinaryLeft
+        }
+    };
+
+    rules[OPERATOR_LESS_THAN] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 100,
+            .nud = NULL,
+            .led = ledBinaryLeft
+        }
+    };
+
+    rules[OPERATOR_LESS_THAN_OREQ] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 100,
+            .nud = NULL,
+            .led = ledBinaryLeft
+        }
+    };
+
+    rules[OPERATOR_GREATER_THAN_OREQ] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 100,
+            .nud = NULL,
+            .led = ledBinaryLeft
+        }
+    };
+
+    rules[OPERATOR_SHIFT_LEFT] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 110,
+            .nud = NULL,
+            .led = ledBinaryLeft
+        }
+    };
+
+    rules[OPERATOR_SHIFT_RIGHT] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 110,
+            .nud = NULL,
+            .led = ledBinaryLeft
+        }
+    };
+
     rules[OPERATOR_ADD] = (Node){
         .type = NODE_OPERATOR,
         .operator = {
@@ -237,12 +427,21 @@ void initRules(void) // building the operator table
         }
     };
 
+    rules[OPERATOR_DIVIDE] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 130,
+            .nud = NULL,
+            .led = ledBinaryLeft
+        }
+    };
+
     rules[OPERATOR_CAST] = (Node){
         .type = NODE_OPERATOR,
         .operator = {
-            .lbp = 140,
-            .nud = nudCast,
-            .led = ledUnary,
+            .lbp = 150,
+            .nud = nudParen,
+            .led = ledCall,
         }
     };
 
@@ -288,6 +487,33 @@ void initRules(void) // building the operator table
             .lbp = 140,
             .nud = nudUnary,
             .led = NULL,
+        }
+    };
+
+    rules[OPERATOR_BRACKET] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 150,
+            .nud = NULL,
+            .led = ledIndex,
+        }
+    };
+
+    rules[OPERATOR_DOT] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 150,
+            .nud = NULL,
+            .led = ledMember,
+        }
+    };
+
+    rules[OPERATOR_ARROW] = (Node){
+        .type = NODE_OPERATOR,
+        .operator = {
+            .lbp = 150,
+            .nud = NULL,
+            .led = ledMember,
         }
     };
 

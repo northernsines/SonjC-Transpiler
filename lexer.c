@@ -119,17 +119,12 @@ bool isOperator (char currentChar) //STUB add all operators
         currentChar == '<' ||
         currentChar == '>' ||
         currentChar == '?' ||
-        currentChar == '$' ||
         currentChar == '.';
 }
 
 bool isMulticharOperator(char *text) //STUB add all multichar operators
 {
     return
-        // string operators (SonjC)
-        !strcmp(text, "$==") ||
-        !strcmp(text, "$=") ||
-        !strcmp(text, "$+") ||
         // three-char
         !strcmp(text, "<<=") ||
         !strcmp(text, ">>=") ||
@@ -137,6 +132,7 @@ bool isMulticharOperator(char *text) //STUB add all multichar operators
         // two-char
         !strcmp(text, "&&") ||
         !strcmp(text, "&=") ||
+        !strcmp(text, "%=") ||
         !strcmp(text, "!=") ||
         !strcmp(text, "*=") ||
         !strcmp(text, "++") ||

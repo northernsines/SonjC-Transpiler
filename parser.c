@@ -10,6 +10,8 @@ Parses tokens emitted by the lexer into an Abstract Syntax Tree.
 
 Node rules[60];
 Node *parseExpression(Parser*, int);
+Node *handleStatement(Parser*);
+Node *handleCodeBlock(Parser*);
 
 Node *handleLiteral(Parser *p)
 {
@@ -100,7 +102,7 @@ Node *handleVarDecl(Parser *p)
         Token typeTok = consume(p, TOKEN_KEYWORD, NULL, "Expected a type keyword to start parameter declaration");
         varDecl->varDecl.name = typeTok.text;
         consume(p, TOKEN_IDENTIFIER, NULL, "Expected parameter name after type");
-        if((!(NEXT(p).type == TOKEN_OPERATOR || NEXT(p).type == TOKEN_PUNCTUATION) && !strcmp(NEXT(p).text, "="))) //exit early if no initalization
+        if (strcmp(CUR(p).text, "=") != 0) //no initializer
         {
             varDecl->varDecl.value = NULL;
             return varDecl;
@@ -166,16 +168,35 @@ Node **handleArgList(Parser *p, bool decleration, int *outCount) //starts on fun
     return params;
 }
 
-Node* handleCallExp(Parser *p)
+Node **handleCallArgs(Parser *p, int *outCount) //starts after opening (, consumes closing )
+{
+    int argCap = 8;
+    Node **args = malloc(sizeof(Node*) * argCap);
+    int argCount = 0;
+
+    if (!IS_CLOSE_PAREN(p))
+    {
+        while (1)
+        {
+            if (argCount >= argCap) { argCap *= 2; args = realloc(args, sizeof(Node*) * argCap); }
+            args[argCount] = parseExpression(p, 10); //rbp 10 stops before comma
+            argCount++;
+            if (!IS_COMMA(p)) break;
+            skip(p, "Expected another argument after , before end of file");
+        }
+    }
+    consume(p, TOKEN_PUNCTUATION, ")", "Expected ) to close call expression");
+    *outCount = argCount;
+    return args;
+}
+
+Node* ledCall(Parser *p, Node *left) //build call expression, ( was already skipped
 {
     Node *exp = malloc(sizeof(Node));
 
     exp->type = NODE_CALL_EXPR;
-    exp->callExpr.name = (CUR(p)).text;
-    int argCount;
-    exp->callExpr.args = handleArgList(p, false, &argCount);
-    exp->callExpr.argCount = argCount;
-    skip(p, "skipping final ) of arg list");
+    exp->callExpr.callee = left;
+    exp->callExpr.args = handleCallArgs(p, &exp->callExpr.argCount);
     return exp;
 }
 
@@ -189,6 +210,15 @@ Node* nudCast(Parser *p)
     skip(p, "skipping ) of cast");
     castExp->cast.exp = parseExpression(p, 139);
     return castExp;
+}
+
+Node* nudParen(Parser *p) //distinguish cast from parenthesized expression
+{
+    if (isTypeName(&CUR(p))) return nudCast(p); //( was already skipped
+
+    Node *exp = parseExpression(p, 0);
+    consume(p, TOKEN_PUNCTUATION, ")", "Expected ) to close parenthesized expression");
+    return exp;
 }
 
 Node* nudUnary(Parser *p) //build unary expression with prefix operator
@@ -210,9 +240,22 @@ Node* nudUnary(Parser *p) //build unary expression with prefix operator
     return exp;
 }
 
-Node* nudAddress(Parser *p)
+Node* nudAddress(Parser *p) //build address-of expression with prefix &
 {
-    //STUB
+    Node *exp = malloc(sizeof(Node));
+
+    Token opToken = PREV(p); //prefix token was already skipped by parseExpression
+    OperatorType opType = lookupOperator(opToken);
+    Node *op = malloc(sizeof(Node));
+
+    op->type = NODE_OPERATOR;
+    op->operator.opType = opType;
+
+    exp->type = NODE_UNARY_EXPR;
+    exp->unaryExpr.operator = op;
+    exp->unaryExpr.exp = parseExpression(p, 139); //bind like a unary, not bitwise AND
+
+    return exp;
 }
 
 Node* nudPrimary(Parser *p) //build literal or var node from current token
@@ -223,10 +266,6 @@ Node* nudPrimary(Parser *p) //build literal or var node from current token
     if (IS_LITERAL(p))
     {
         node = handleLiteral(p);
-    }
-    else if (NEXT_PUNCT(p, "(")) //call expression
-    {
-        node = handleCallExp(p);
     }
     else // variable
     {
@@ -239,7 +278,20 @@ Node* nudPrimary(Parser *p) //build literal or var node from current token
 
 Node* ledUnary(Parser *p, Node *left) //build unary expression with postfix operator
 {
+    Node *exp = malloc(sizeof(Node));
 
+    Token opToken = PREV(p); //postfix token was already skipped by parseExpression
+    OperatorType opType = lookupOperator(opToken);
+    Node *op = malloc(sizeof(Node));
+
+    op->type = NODE_OPERATOR;
+    op->operator.opType = opType;
+
+    exp->type = NODE_UNARY_EXPR;
+    exp->unaryExpr.operator = op;
+    exp->unaryExpr.exp = left;
+
+    return exp;
 }
 
 Node* ledBinaryLeft(Parser *p, Node *left) //build new left, starts on right of op, creates binary expression with left, operator, right
@@ -282,6 +334,55 @@ Node* ledBinaryRight(Parser *p, Node *left) //right assoc version
     return exp; //return binary expression as new left
 }
 
+Node* ledTernary(Parser *p, Node *left) //build ternary expression, ? was already skipped
+{
+    Node *exp = malloc(sizeof(Node));
+
+    Token opToken = PREV(p);
+    OperatorType opType = lookupOperator(opToken);
+    Node *op = malloc(sizeof(Node));
+
+    op->type = NODE_OPERATOR;
+    op->operator.opType = opType;
+
+    exp->type = NODE_TERNARY_EXPR;
+    exp->ternaryExpr.operator = op;
+    exp->ternaryExpr.conditionExp = left;
+    exp->ternaryExpr.ifTrueExp = parseExpression(p, 0); //stops at :
+    consume(p, TOKEN_PUNCTUATION, ":", "Expected : in ternary expression");
+    exp->ternaryExpr.ifFalseExp = parseExpression(p, 29); //right assoc
+
+    return exp;
+}
+
+Node* ledMember(Parser *p, Node *left) //build member access, . or -> was already skipped
+{
+    Node *exp = malloc(sizeof(Node));
+
+    Token opToken = PREV(p);
+    bool isArrow = !strcmp(opToken.text, "->");
+    Token member = consume(p, TOKEN_IDENTIFIER, NULL, "Expected member name after . or ->");
+
+    exp->type = NODE_MEMBER_EXPR;
+    exp->memberExpr.object = left;
+    exp->memberExpr.member = member.text;
+    exp->memberExpr.isArrow = isArrow;
+
+    return exp;
+}
+
+Node* ledIndex(Parser *p, Node *left) //build index expression, [ was already skipped
+{
+    Node *exp = malloc(sizeof(Node));
+
+    exp->type = NODE_INDEX_EXPR;
+    exp->indexExpr.target = left;
+    exp->indexExpr.index = parseExpression(p, 0);
+    consume(p, TOKEN_PUNCTUATION, "]", "Expected ] to close index expression");
+
+    return exp;
+}
+
 Node *parseExpression(Parser *p, int rbp) //parses the actual stream of expression tokens
 {
     Token tok = CUR(p);
@@ -319,66 +420,92 @@ Node *parseExpression(Parser *p, int rbp) //parses the actual stream of expressi
 
 Node *handleIfStatement(Parser *p)
 {
-    //STUB implement if statements
+    Node* statement = malloc(sizeof(Node));
+    if (IS_KEYWORD(p, "if"))
+    {
+        statement->type = NODE_IF_STMT;
+        consume(p, TOKEN_KEYWORD, "if", "expected if statement");
+        consume(p, TOKEN_PUNCTUATION, "(", "Expected ( after if"); //consume paren so ) fallthrough means it will stop on final ), leaving it as cur
+        statement->ifStmt.expr = parseExpression(p, 0);
+        consume(p, TOKEN_PUNCTUATION, ")", "Expected ) after if condition");
+        statement->ifStmt.logic = handleStatement(p);
+        if(IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif")) statement->ifStmt.elseStmt = handleIfStatement(p);
+        else statement->ifStmt.elseStmt = NULL;
+    }
+    else if (IS_KEYWORD(p, "else"))
+    {
+        statement->type = NODE_ELSE_STMT;
+        consume(p, TOKEN_KEYWORD, "else", "expected else statement");
+        statement->elseStmt.logic = handleStatement(p);
+    }
+    else if (IS_KEYWORD(p, "elif")) //another terrible repetitive kludge because i am too lazy to refactor
+    {
+        statement->type = NODE_ELSE_STMT;
+        consume(p, TOKEN_KEYWORD, "elif", "expected elif statement");
+        Node* elifStmt = malloc(sizeof(Node)); 
+        elifStmt->type = NODE_IF_STMT; 
+        statement->elseStmt.logic = elifStmt; //wrap if statement in else statement
+        consume(p, TOKEN_PUNCTUATION, "(", "Expected ( after elif");
+        elifStmt->ifStmt.expr = parseExpression(p, 0);
+        consume(p, TOKEN_PUNCTUATION, ")", "Expected ) after elif condition");
+        elifStmt->ifStmt.logic = handleStatement(p);
+        if(IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif")) elifStmt->ifStmt.elseStmt = handleIfStatement(p);
+        else elifStmt->ifStmt.elseStmt = NULL;
+    }
+    return statement;
 }
 
 Node *handleExpressionStatement(Parser *p)
 {
     Node *expressionStatement = malloc(sizeof(Node));
-    int startpos = p->pos; //cache starting position
-    while(!IS_SEMICOLON(p))
-    {
-        skip(p, "expected semicolon before end of file!");
-    }
-    p->pos = startpos;
     expressionStatement->type = NODE_EXPR_STMT;
     expressionStatement->exprStmt.expr = parseExpression(p, 0);
+    consume(p, TOKEN_PUNCTUATION, ";", "Expected ; to terminate statement!");
     return expressionStatement;
 }
 
 Node *handleStatement(Parser *p) //starts on whatever is after ; or }
 {
-    Node *statement;
     //logic for determining kind of statement will go here
     //STUB, not all statements implemented.
-    if(IS_KEYWORD(p, "if"))
+    if (IS_KEYWORD(p, "if")) return handleIfStatement(p);
+    if (IS_OPEN_BRACE(p)) return handleCodeBlock(p);
+    if (IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif")) parserError("Expected opening if statement to else or elif at position %d", p->pos);
+    if (isTypeName(&CUR(p)))
     {
-        statement = handleIfStatement(p);
+        Node *decl = handleVarDecl(p);
+        consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after variable declaration");
+        return decl;
     }
-    else statement = handleExpressionStatement(p);
-    return statement;
+    return handleExpressionStatement(p);
 }
 
-Node *handleCodeBlock(Parser *p) //starts on opening {
-{ 
+Node *handleCodeBlock(Parser *p) //starts on opening {, ends after closing }
+{
     Node *block = malloc(sizeof(Node));
     block->type = NODE_BLOCK;
 
     int statementCap = 8;
     Node **statements = malloc(sizeof(Node*) * statementCap);
     int statementCount = 0;
-    consume(p, TOKEN_PUNCTUATION, "{", "Expected opening { after function arguments!");
-    int scope = 1; //consume opening { and set scope to 1
-    do
+
+    consume(p, TOKEN_PUNCTUATION, "{", "Expected opening { for code block");
+
+    while (!IS_CLOSE_BRACE(p))
     {
-        if (IS_OPEN_BRACE(p)) scope++;
-        if (IS_CLOSE_BRACE(p)) scope--;
-        if (scope == 0) break; //exit early if end of code block
-        if (IS_CLOSE_BRACE(p)) continue; //do not process statement if empty
-        if (statementCount >= statementCap) 
+        if (p->pos >= p->tokenCount || CUR(p).type == TOKEN_EOF)
+            parserError("Expected } before end of file");
+
+        if (statementCount >= statementCap)
         {
             statementCap *= 2;
-            statements = realloc(statements, sizeof(Node*) * statementCap); 
+            statements = realloc(statements, sizeof(Node*) * statementCap);
         }
-        statements[statementCount] = handleStatement(p);
-        statementCount++;
-        while (!IS_SEMICOLON(p) && !IS_CLOSE_BRACE(p))
-        {
-            skip(p, "Expected ; or } before end of file");
-        }
-        if(IS_SEMICOLON(p)) consume(p, TOKEN_PUNCTUATION, ";", "Expected ; to terminate statement!");
-    } while (scope != 0);
+        statements[statementCount++] = handleStatement(p);
+    }
+
     consume(p, TOKEN_PUNCTUATION, "}", "Expected } at end of code block");
+
     block->block.statements = statements;
     block->block.count = statementCount;
     return block;

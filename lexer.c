@@ -48,14 +48,9 @@ bool isKeyword(char *text) //STUB add all keywords
         // standard C types/qualifiers
         !strcmp(text, "int") ||
         !strcmp(text, "float") ||
-        !strcmp(text, "double") ||
         !strcmp(text, "char") ||
         !strcmp(text, "bool") ||
         !strcmp(text, "void") ||
-        !strcmp(text, "short") ||
-        !strcmp(text, "long") ||
-        !strcmp(text, "signed") ||
-        !strcmp(text, "unsigned") ||
         !strcmp(text, "const") ||
         !strcmp(text, "volatile") ||
         !strcmp(text, "static") ||
@@ -84,7 +79,6 @@ bool isKeyword(char *text) //STUB add all keywords
         !strcmp(text, "union") ||
         !strcmp(text, "typedef") ||
         !strcmp(text, "sizeof") ||
-        !strcmp(text, "size_t") ||
         // GNU/common extension
         !strcmp(text, "typeof") ||
         !strcmp(text, "asm") ||
@@ -151,7 +145,7 @@ bool isMulticharOperator(char *text) //STUB add all multichar operators
         !strcmp(text, "|=");
 }
 
-bool isPunctuation (char currentChar) //STUBB add all list of punctuation
+bool isPunctuation (char currentChar) //STUB add all list of punctuation
 {
     return
         currentChar == '{' ||
@@ -381,30 +375,42 @@ void readOperator(Lexer *lexer, int *currentSize)
         currentChar = lexer->source[lexer->pos];
         (*currentSize)++;
 
-        if(isOperator(currentChar)) //triple char operator!
+        if(isOperator(currentChar))
         {
             lexer->currentText[2] = currentChar;
             lexer->currentText[3] = '\0';
 
             if(!isMulticharOperator(lexer->currentText))
             {
-                fprintf(stderr, "invalid multichar operator, line: %d, col %d\n",
-                        lexer->line, lexer->col);
-                exit(EXIT_FAILURE);
-            }
+                lexer->currentText[2] = '\0';
 
-            (*currentSize)++;
+                if(isMulticharOperator(lexer->currentText))
+                {
+                    retreat(lexer);
+                }
+                else
+                {
+                    lexer->currentText[1] = '\0';
+                    *currentSize = 1;
+                    retreat(lexer);
+                    retreat(lexer);
+                }
+            }
+            else
+            {
+                (*currentSize)++;
+            }
         }
-        else //double char operator
+        else
         {
             retreat(lexer);
             lexer->currentText[2] = '\0';
 
             if(!isMulticharOperator(lexer->currentText))
             {
-                fprintf(stderr, "invalid multichar operator, line: %d, col %d\n",
-                        lexer->line, lexer->col);
-                exit(EXIT_FAILURE);
+                lexer->currentText[1] = '\0';
+                (*currentSize)--;
+                retreat(lexer);
             }
         }
     }

@@ -12,6 +12,9 @@ Node rules[60];
 Node *parseExpression(Parser*, int);
 Node *handleStatement(Parser*);
 Node *handleCodeBlock(Parser*);
+Node *parseType(Parser*);
+Node *handleTypedef(Parser*);
+Node *handleGlobal(Parser*);
 
 Node *handleLiteral(Parser *p)
 {
@@ -42,8 +45,8 @@ Node *handleLiteral(Parser *p)
     else if(literal->type == NODE_FIXED_LITERAL) // Q32.32 fixed point algorithm
     {
         int i;
-        char *intPartStr = malloc(strlen(str));
-        char *fracPartStr = malloc(strlen(str));
+        char *intPartStr = malloc(strlen(str) + 1);
+        char *fracPartStr = malloc(strlen(str) + 1);
         for(i = 0; i < strSize; i++) //iterate until detect . build left string
         {
             char ch = str[i];
@@ -95,50 +98,218 @@ Node *handleLiteral(Parser *p)
     return literal;
 }
 
-Node *handleVarDecl(Parser *p)
+static bool isTypeQualifierStart(Parser *p)
 {
-        Node *varDecl = malloc(sizeof(Node));
-        varDecl->type = NODE_VAR_DECL;
-        Token typeTok = consume(p, TOKEN_KEYWORD, NULL, "Expected a type keyword to start parameter declaration");
-        varDecl->varDecl.name = typeTok.text;
-        consume(p, TOKEN_IDENTIFIER, NULL, "Expected parameter name after type");
-        if (strcmp(CUR(p).text, "=") != 0) //no initializer
-        {
-            varDecl->varDecl.value = NULL;
-            return varDecl;
-        }
-        skip(p, "expected decleration literal before end of file"); //skip =
-        Node *valueLiteral = malloc(sizeof(Node));
-        valueLiteral = handleLiteral(p);
-        varDecl->varDecl.value = valueLiteral;
-        return varDecl;
+    return IS_OPEN_PAREN(p) || IS_OPEN_BRACKET(p) ||
+           IS_OP(p, "*") ||
+           IS_KEYWORD(p, "const") || IS_KEYWORD(p, "volatile");
 }
 
-Node *handleParam(Parser *p, bool decleration)
+static Node *makeSimpleQualifier(SimpleQualifier simpleQual, QualifierKind kind)
 {
-    Node *param = malloc(sizeof(Node));
-    if (decleration)
+    Node *qualifier = malloc(sizeof(Node));
+    qualifier->type = NODE_TYPE_QUALIFIER;
+    qualifier->typeQualifier.kind = kind;
+    qualifier->typeQualifier.simpleQual = simpleQual;
+    return qualifier;
+}
+
+static Node *handleArrayQualifier(Parser *p)
+{
+    Node *qualifier = malloc(sizeof(Node));
+    qualifier->type = NODE_TYPE_QUALIFIER;
+    qualifier->typeQualifier.kind = QUAL_ARRAY;
+
+    consume(p, TOKEN_PUNCTUATION, "[", "Expected [ to begin array type");
+    Token sizeTok = consume(p, TOKEN_INTEGER, NULL, "Expected integer array size");
+    qualifier->typeQualifier.arraySize = atoi(sizeTok.text);
+    consume(p, TOKEN_PUNCTUATION, "]", "Expected ] after array size");
+
+    return qualifier;
+}
+
+static Node *handleFuncQualifier(Parser *p)
+{
+    Node *qualifier = malloc(sizeof(Node));
+    qualifier->type = NODE_TYPE_QUALIFIER;
+    qualifier->typeQualifier.kind = QUAL_FUNCTION;
+
+    int paramCap = 8;
+    int paramCount = 0;
+    Node **params = malloc(sizeof(Node*) * paramCap);
+
+    consume(p, TOKEN_PUNCTUATION, "(", "Expected ( to begin function type");
+
+    if (IS_CLOSE_PAREN(p))
     {
-        param = handleVarDecl(p);
-        return param;
+        consume(p, TOKEN_PUNCTUATION, ")", "Expected ) to close function type");
+    }
+    else if (IS_VOID_KW(p) && NEXT_PUNCT(p, ")"))
+    {
+        skip(p, "advancing past void in function type");
+        consume(p, TOKEN_PUNCTUATION, ")", "Expected ) to close function type");
     }
     else
     {
-        if (IS_LITERAL(p))
+        while (1)
         {
-            param = handleLiteral(p);
+            if (paramCount >= paramCap)
+            {
+                paramCap *= 2;
+                params = realloc(params, sizeof(Node*) * paramCap);
+            }
+
+            params[paramCount++] = parseType(p);
+
+            if (IS_COMMA(p))
+            {
+                skip(p, "advancing past , in function type");
+                continue;
+            }
+            break;
         }
-        else if (IS_IDENTIFIER(p))
-        {
-            param->type = NODE_VAR;
-            param->var.name = CUR(p).text;
-        }
-        else parserError("Invalid argument type at position: %d", p->pos);
-        return param;
+
+        consume(p, TOKEN_PUNCTUATION, ")", "Expected ) to close function type");
     }
+
+    qualifier->typeQualifier.funcQual.params = params;
+    qualifier->typeQualifier.funcQual.paramCount = paramCount;
+
+    return qualifier;
 }
 
-Node **handleArgList(Parser *p, bool decleration, int *outCount) //starts on function name
+static Node *handleTypeQualifier(Parser *p) //starts on qualifier, consumes qualifier to wind up on next token after it
+{
+    if (IS_OPEN_PAREN(p)) return handleFuncQualifier(p);
+    if (IS_OPEN_BRACKET(p)) return handleArrayQualifier(p);
+
+    if (IS_OP(p, "*"))
+    {
+        Node *qualifier = makeSimpleQualifier(SQ_POINTER, QUAL_POINTER);
+        skip(p, "advancing past * in type");
+        return qualifier;
+    }
+    if (IS_KEYWORD(p, "const"))
+    {
+        Node *qualifier = makeSimpleQualifier(SQ_CONST, QUAL_CONST);
+        skip(p, "advancing past const in type");
+        return qualifier;
+    }
+    if (IS_KEYWORD(p, "volatile"))
+    {
+        Node *qualifier = makeSimpleQualifier(SQ_VOLATILE, QUAL_VOLATILE);
+        skip(p, "advancing past volatile in type");
+        return qualifier;
+    }
+
+    return NULL;
+}
+
+Node *parseType(Parser *p) // type -> [type (qualifier)], can parse itself through wrapping itself up in a loop!
+{
+    Node *currentType;
+    Token base = CUR(p);
+    PrimitiveType primitive;
+
+    if (primitiveFromToken(&base, &primitive))
+    {
+        currentType = malloc(sizeof(Node));
+        currentType->type = NODE_PRIMITIVE;
+        currentType->primitiveType.type = primitive;
+        skip(p, "expected qualifier or name after type");
+    }
+    else if (base.type == TOKEN_IDENTIFIER)
+    {
+        currentType = malloc(sizeof(Node));
+        currentType->type = NODE_TYPEREF;
+        currentType->typeRef.name = base.text;
+        skip(p, "expected qualifier or name after type");
+    }
+    else
+    {
+        parserError("Expected type name at position %d, got '%s'", p->pos, base.text);
+        return NULL;
+    }
+
+    bool hasPreviousQualifier = false;
+    QualifierKind previousKind = QUAL_POINTER;
+
+    while (isTypeQualifierStart(p))
+    {
+        if (IS_OPEN_BRACKET(p) && hasPreviousQualifier && previousKind == QUAL_ARRAY)
+            parserError("Adjacent array brackets are not allowed; typedef an array first");
+
+        Node *qualifier = handleTypeQualifier(p);
+        Node *wrapped = malloc(sizeof(Node));
+        wrapped->type = NODE_TYPE;
+        wrapped->typeNode.innerType = currentType;
+        wrapped->typeNode.qualifier = qualifier;
+
+        currentType = wrapped;
+        previousKind = qualifier->typeQualifier.kind;
+        hasPreviousQualifier = true;
+    }
+
+    return currentType;
+}
+
+Node *handleVarDecl(Parser *p) //create var declaration in the format varDecl -> [type name (expr)]
+{
+    Node *varDecl = malloc(sizeof(Node));
+    varDecl->type = NODE_VAR_DECL;
+    varDecl->varDecl.type = parseType(p);
+
+    Node *outerType = varDecl->varDecl.type;
+    if (outerType->type == NODE_TYPE &&
+        outerType->typeNode.qualifier->typeQualifier.kind == QUAL_FUNCTION)
+        parserError("A variable cannot have a bare function type; declare a pointer to function instead");
+
+    Token nameTok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected variable name after type");
+
+    Node *var = malloc(sizeof(Node));
+    var->type = NODE_VAR;
+    var->var.name = nameTok.text;
+    varDecl->varDecl.var = var;
+
+    if (IS_OP(p, "="))
+    {
+        skip(p, "advancing past = in variable declaration");
+        varDecl->varDecl.valueExpr = parseExpression(p, 10);
+    }
+    else
+    {
+        varDecl->varDecl.valueExpr = NULL;
+    }
+
+    return varDecl;
+}
+
+Node *handleTypedef(Parser *p)
+{
+    Node *typeDecl = malloc(sizeof(Node));
+    typeDecl->type = NODE_TYPE_DECL;
+
+    consume(p, TOKEN_KEYWORD, "typedef", "Expected typedef");
+    typeDecl->typeDecl.underlyingInstance = parseType(p);
+
+    Token aliasTok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected typedef alias name");
+    consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after typedef");
+    typeDecl->typeDecl.aliasName = aliasTok.text;
+
+    p->defTypes = realloc(p->defTypes, sizeof(char*) * (p->defTypeCount + 1));
+    p->defTypes[p->defTypeCount++] = aliasTok.text;
+
+    return typeDecl;
+}
+
+Node *handleParam(Parser *p, bool declaration)
+{
+    if (declaration) return handleVarDecl(p);
+    if (IS_LITERAL(p)) return handleLiteral(p);
+    return parseExpression(p, 0);
+}
+
+Node **handleArgList(Parser *p, bool declaration, int *outCount) //starts on function name
 {
     int paramCap = 8;
     Node **params = malloc(sizeof(Node*) * paramCap);
@@ -147,23 +318,29 @@ Node **handleArgList(Parser *p, bool decleration, int *outCount) //starts on fun
     skip(p, "Expected ( after name to begin argument list"); // step off name, onto (
     consume(p, TOKEN_PUNCTUATION, "(", "Expected ( to begin argument list");
 
-    while (!IS_CLOSE_PAREN(p))
+    if (IS_VOID_KW(p) && NEXT_PUNCT(p, ")"))
     {
-        if (IS_VOID_KW(p))
-        {
-            paramCount = 0;
-            break;
-        }
-        if (paramCount >= paramCap) { paramCap *= 2; params = realloc(params, sizeof(Node*) * paramCap); }
-        params[paramCount] = handleParam(p, decleration);
-        paramCount++;
-        while (!IS_COMMA(p) && !IS_CLOSE_PAREN(p))
-        {
-            skip(p, "Expected , or closing ) before end of file");
-        }
-        if (IS_COMMA(p)) skip(p, "Expected another argument after , before end of file");
+        skip(p, "advancing past void in parameter list");
     }
 
+    while (!IS_CLOSE_PAREN(p))
+    {
+        if (p->pos >= p->tokenCount || CUR(p).type == TOKEN_EOF)
+            parserError("Expected ) before end of file in parameter list");
+
+        if (paramCount >= paramCap) { paramCap *= 2; params = realloc(params, sizeof(Node*) * paramCap); }
+        params[paramCount++] = handleParam(p, declaration);
+
+        if (IS_COMMA(p))
+        {
+            skip(p, "advancing past , in parameter list");
+            continue;
+        }
+        if (!IS_CLOSE_PAREN(p))
+            parserError("Expected , or ) in parameter list at position %d", p->pos);
+    }
+
+    consume(p, TOKEN_PUNCTUATION, ")", "Expected ) to close parameter list");
     *outCount = paramCount;
     return params;
 }
@@ -205,16 +382,15 @@ Node* nudCast(Parser *p)
     Node *castExp = malloc(sizeof(Node));
 
     castExp->type = NODE_CAST;
-    castExp->cast.type = CUR(p).text;
-    skip(p, "skipping type of cast");
-    skip(p, "skipping ) of cast");
+    castExp->cast.type = parseType(p);
+    consume(p, TOKEN_PUNCTUATION, ")", "expected closing paren on cast");
     castExp->cast.exp = parseExpression(p, 139);
     return castExp;
 }
 
 Node* nudParen(Parser *p) //distinguish cast from parenthesized expression
 {
-    if (isTypeName(&CUR(p))) return nudCast(p); //( was already skipped
+    if (isTypeName(p, &CUR(p))) return nudCast(p); //( was already skipped
 
     Node *exp = parseExpression(p, 0);
     consume(p, TOKEN_PUNCTUATION, ")", "Expected ) to close parenthesized expression");
@@ -418,6 +594,14 @@ Node *parseExpression(Parser *p, int rbp) //parses the actual stream of expressi
     return left;
 }
 
+Node *handleForeverStatement(Parser *p) {
+    Node* foreverStmt = malloc(sizeof(Node));
+    foreverStmt->type = NODE_FOREVER_STMT;
+    consume(p, TOKEN_KEYWORD, "forever", "expected forever statement");
+    foreverStmt->foreverLoop.logic = handleStatement(p);
+    return foreverStmt;
+}
+
 Node *handleIfStatement(Parser *p)
 {
     Node* statement = malloc(sizeof(Node));
@@ -468,10 +652,12 @@ Node *handleStatement(Parser *p) //starts on whatever is after ; or }
 {
     //logic for determining kind of statement will go here
     //STUB, not all statements implemented.
-    if (IS_KEYWORD(p, "if")) return handleIfStatement(p);
     if (IS_OPEN_BRACE(p)) return handleCodeBlock(p);
+    if (IS_KEYWORD(p, "if")) return handleIfStatement(p);
     if (IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif")) parserError("Expected opening if statement to else or elif at position %d", p->pos);
-    if (isTypeName(&CUR(p)))
+    if (IS_KEYWORD(p, "forever")) return handleForeverStatement(p);
+    if (IS_KEYWORD(p, "typedef")) return handleTypedef(p);
+    if (isTypeName(p, &CUR(p)))
     {
         Node *decl = handleVarDecl(p);
         consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after variable declaration");
@@ -513,35 +699,37 @@ Node *handleCodeBlock(Parser *p) //starts on opening {, ends after closing }
 
 char *handleImport(Parser *p)
 {
-    if (p->pos <= 0) parserError("Position for import identifier landed at or before 0");
+    consume(p, TOKEN_KEYWORD, "import", "Expected import");
     Token nameTok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected import name");
     consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after import name");
     return nameTok.text;
 }
 
-Node *handleGlobal(Parser *p) //STUB
+Node *handleGlobal(Parser *p)
 {
-    Node *global = malloc(sizeof(Node));
-    global->type = NODE_VAR_DECL; // placeholder
+    Node *global = handleVarDecl(p);
+    consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after global declaration");
     return global;
 }
 
 Node *handleFunction(Parser *p)
 {
-    if (p->pos <= 0) parserError("Position for function name landed at or before 0");
-
     Node *function = malloc(sizeof(Node));
     function->type = NODE_FUNCTION_DECL;
     function->functionDecl.name = CUR(p).text;
-    if (p->tokens[p->pos - 1].type != TOKEN_KEYWORD) function->functionDecl.returnType = "void";
-    else function->functionDecl.returnType = p->tokens[p->pos - 1].text;
+
+    if (p->pos > 0 &&
+        (p->tokens[p->pos - 1].type == TOKEN_KEYWORD ||
+         p->tokens[p->pos - 1].type == TOKEN_IDENTIFIER))
+        function->functionDecl.returnType = p->tokens[p->pos - 1].text;
+    else
+        function->functionDecl.returnType = "void";
 
     int paramCount;
     Node **params = handleArgList(p, true, &paramCount);
     function->functionDecl.paramCount = paramCount;
     function->functionDecl.params = params;
 
-    skip(p, "Expected { after parameter list"); // step off closing )
     if (!IS_OPEN_BRACE(p)) parserError("Expected { to begin function body at position %d", p->pos);
     function->functionDecl.body = handleCodeBlock(p);
     return function;
@@ -549,8 +737,6 @@ Node *handleFunction(Parser *p)
 
 Node *parse(Parser *p) //STUB: ADD PREPROCESSOR DIRECTIVES | main parsing loop
 {
-    int scope = 0;
-
     int importCount = 0;
     int functionCount = 0;
     int globalCount = 0;
@@ -562,53 +748,47 @@ Node *parse(Parser *p) //STUB: ADD PREPROCESSOR DIRECTIVES | main parsing loop
 
     while (CUR(p).type != TOKEN_EOF)
     {
-        bool isImport =
-            scope == 0 &&
-            p->pos > 0 &&
-            p->tokens[p->pos - 1].type == TOKEN_KEYWORD &&
-            IS_IDENTIFIER(p) &&
-            !strcmp(p->tokens[p->pos - 1].text, "import"); //test for import with import keyword at top level
-        bool isFunction =
-            scope == 0 &&
-            p->pos > 0 &&
-            IS_IDENTIFIER(p) &&
-            p->tokens[p->pos + 1].type == TOKEN_PUNCTUATION &&
-            !strcmp(p->tokens[p->pos + 1].text, "("); //Maybe stub? test for functions wth identifier plus ( at top level
-        bool isGlobal =
-            scope == 0 &&
-            p->pos > 0 &&
-            p->tokens[p->pos - 1].type == TOKEN_KEYWORD &&
-            IS_IDENTIFIER(p) &&
-            strcmp(p->tokens[p->pos - 1].text, "import"); //Maybe stub? test for global with keyword at top level but NOT import
-
-        if (IS_OPEN_BRACE(p)) scope++;
-        if (IS_CLOSE_BRACE(p)) scope--;
-
-        bool handled = false;
-
-        if (isImport)
+        if (IS_KEYWORD(p, "import"))
         {
             if (importCount >= importCap) { importCap *= 2; imports = realloc(imports, sizeof(char*) * importCap); }
-            imports[importCount] = handleImport(p);
-            importCount++;
-            handled = true;
-        }
-        if (isFunction)
-        {
-            if (functionCount >= functionCap) { functionCap *= 2; functions = realloc(functions, sizeof(Node*) * functionCap); }
-            functions[functionCount] = handleFunction(p);
-            functionCount++;
-            handled = true;
-        }
-        if (isGlobal)
-        {
-            if (globalCount >= globalCap) { globalCap *= 2; globals = realloc(globals, sizeof(Node*) * globalCap); }
-            globals[globalCount] = handleGlobal(p);
-            globalCount++;
-            handled = true;
+            imports[importCount++] = handleImport(p);
+            continue;
         }
 
-        if (!handled) p->pos++;
+        if (IS_KEYWORD(p, "typedef"))
+        {
+            if (globalCount >= globalCap) { globalCap *= 2; globals = realloc(globals, sizeof(Node*) * globalCap); }
+            globals[globalCount++] = handleTypedef(p);
+            continue;
+        }
+
+        if (IS_IDENTIFIER(p) && NEXT_PUNCT(p, "("))
+        {
+            if (functionCount >= functionCap) { functionCap *= 2; functions = realloc(functions, sizeof(Node*) * functionCap); }
+            functions[functionCount++] = handleFunction(p);
+            continue;
+        }
+
+        if (isTypeName(p, &CUR(p)))
+        {
+            bool isSimpleFunction =
+                NEXT_IDENTIFIER(p) &&
+                p->pos + 2 < p->tokenCount &&
+                p->tokens[p->pos + 2].type == TOKEN_PUNCTUATION &&
+                !strcmp(p->tokens[p->pos + 2].text, "(");
+
+            if (isSimpleFunction)
+            {
+                p->pos++;
+                continue;
+            }
+
+            if (globalCount >= globalCap) { globalCap *= 2; globals = realloc(globals, sizeof(Node*) * globalCap); }
+            globals[globalCount++] = handleGlobal(p);
+            continue;
+        }
+
+        parserError("Unexpected token '%s' at top level, position %d", CUR(p).text, p->pos);
     }
 
     Node *programNode = malloc(sizeof(Node));

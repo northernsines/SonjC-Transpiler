@@ -34,6 +34,9 @@ typedef enum {
     NODE_DO_WHILE_STMT,
     NODE_FOR_STMT,
     NODE_ITERATE_STMT,
+    NODE_UNTIL_STMT,
+    NODE_REPEAT_STMT,
+    NODE_FOREVER_STMT,
     NODE_RETURN_STMT,
     NODE_BREAK_STMT,
     NODE_CONTINUE_STMT,
@@ -42,7 +45,12 @@ typedef enum {
     NODE_INSTANCE_DECL,
     NODE_MEMBER_EXPR,
     NODE_INDEX_EXPR,
-    NODE_BOOL_LITERAL
+    NODE_BOOL_LITERAL,
+    NODE_TYPE_DECL,
+    NODE_TYPE,
+    NODE_PRIMITIVE,
+    NODE_TYPEREF,
+    NODE_TYPE_QUALIFIER
     //STUB, confirm all possible nodes added
 } NodeType;
 
@@ -105,11 +113,41 @@ typedef enum {
     //STUB, add operators
 } OperatorType; //grouped by lbp
 
+typedef enum {
+    PRIMITIVE_INT,
+    PRIMITIVE_CHAR,
+    PRIMITIVE_FLOAT,
+    PRIMITIVE_VOID, //technically a primitive type, will be flagged in analyzer if without qualifiers.
+    PRIMITIVE_FIXED,
+    PRIMITIVE_BOOL,
+    //STUB, add all primitive types
+} PrimitiveType; //primitive, built in types
+
 typedef struct {
     Token *tokens;
     int tokenCount;
     int pos;
+    char** defTypes;
+    int defTypeCount;
 } Parser;
+
+typedef enum {
+    SQ_POINTER,
+    SQ_CONST,
+    SQ_VOLATILE,
+    SQ_UNSIGNED,
+    SQ_SIGNED,
+} SimpleQualifier; //type qualifiers that don't need to carry any
+
+typedef enum {
+    QUAL_POINTER,
+    QUAL_CONST,
+    QUAL_VOLATILE,
+    QUAL_UNSIGNED,
+    QUAL_SIGNED,
+    QUAL_ARRAY,
+    QUAL_FUNCTION,
+} QualifierKind;
 
 typedef struct Node{
     NodeType type;
@@ -133,14 +171,15 @@ typedef struct Node{
         } functionDecl;
 
         struct { // variable declaration
-            char *name;
-            struct Node *value;
+            struct Node *type;
+            struct Node *var;
+            struct Node *valueExpr;
         } varDecl;
 
         struct { // typedef aliasing
             char *aliasName;
             struct Node *underlyingInstance;
-            char *underlyingTypeName;
+
         } typeDecl;
 
         struct { // instance declaration
@@ -160,15 +199,37 @@ typedef struct Node{
             struct Node *expr;
         } exprStmt;
 
-        struct { // expression statement
+        struct { //if statement
             struct Node *expr;
             struct Node *logic; //block OR statement direct
             struct Node *elseStmt;
         } ifStmt;
 
-        struct { // expression statement
-            struct Node *logic; //block OR statement direct
+        struct { // else statement
+            struct Node *logic;
         } elseStmt;
+
+        struct {
+            struct Node *logic;
+        } foreverLoop; // forever loop, no args
+
+        struct {
+            struct Node *expr;
+            struct Node *logic;
+        } singleArgLoop; //while, until, repeat
+
+        struct {
+            struct Node *source;
+            struct Node *item;
+            struct Node *logic;
+        } iterateLoop; //iterate loop
+
+        struct {
+            struct Node *init;
+            struct Node *condition;
+            struct Node *update;
+            struct Node *logic;
+        } forLoop; //for loop
 
         struct { // call expression
             struct Node *callee;
@@ -213,7 +274,7 @@ typedef struct Node{
 
         struct { // bool literal
             bool value;
-        } boolLiteral;        
+        } boolLiteral;
 
         struct { // operator
             OperatorType opType;
@@ -241,9 +302,35 @@ typedef struct Node{
         } ternaryExpr;
 
         struct {
-            char* type;
+            struct Node *type;
             struct Node *exp;
         } cast;
+
+        struct {
+            struct Node *innerType;
+            struct Node *qualifier;
+        } typeNode; //type specifier
+
+        struct {
+            PrimitiveType type;
+        } primitiveType; //for primitive built-in types.
+
+        struct {
+            char* name;
+        } typeRef; //for references to user-defined types.
+
+        struct {
+            QualifierKind kind;
+            union {
+                SimpleQualifier simpleQual;
+                int arraySize;
+                struct {
+                    struct Node **params;
+                    int paramCount;
+                }funcQual;
+            };
+        } typeQualifier;
+
         //STUB add all nodes
     };
 } Node;
@@ -255,6 +342,7 @@ typedef struct Node{
 
 // common token-check macros
 #define IS_PUNCT(p, s)       (CUR(p).type == TOKEN_PUNCTUATION && !strcmp(CUR(p).text, (s)))
+#define IS_OP(p, s)          (CUR(p).type == TOKEN_OPERATOR && !strcmp(CUR(p).text, (s)))
 #define IS_KEYWORD(p, s)     (CUR(p).type == TOKEN_KEYWORD && !strcmp(CUR(p).text, (s)))
 #define IS_IDENTIFIER(p)     (CUR(p).type == TOKEN_IDENTIFIER)
 #define IS_LITERAL(p) ( \
@@ -286,16 +374,19 @@ typedef struct Node{
 #define IS_CLOSE_PAREN(p)    IS_PUNCT(p, ")")
 #define IS_OPEN_BRACE(p)     IS_PUNCT(p, "{")
 #define IS_CLOSE_BRACE(p)    IS_PUNCT(p, "}")
+#define IS_OPEN_BRACKET(p)   IS_PUNCT(p, "[")
+#define IS_CLOSE_BRACKET(p)  IS_PUNCT(p, "]")
 #define IS_COMMA(p)          IS_PUNCT(p, ",")
 #define IS_SEMICOLON(p)      IS_PUNCT(p, ";")
 #define IS_VOID_KW(p)        IS_KEYWORD(p, "void")
 
-//neccessary function declerations
+//necessary function declarations
 Node *parse(Parser *p);
 
 //utility functions (implemented in parser_utils.c)
 void parserError(const char *message, ...);
-bool isTypeName(Token *t);
+bool primitiveFromToken(Token *t, PrimitiveType *out);
+bool isTypeName(Parser *p, Token *t);
 const char *tokenTypeName(TokenType t);
 Token consume(Parser *p, TokenType expectedType, const char *expectedText, const char *context);
 void skip(Parser *p, const char *context);

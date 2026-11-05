@@ -84,6 +84,69 @@ const char *operatorTypeToString(OperatorType op)
     return "unknown";
 }
 
+static const char *primitiveTypeToString(PrimitiveType type)
+{
+    switch (type)
+    {
+        case PRIMITIVE_INT:   return "int";
+        case PRIMITIVE_CHAR:  return "char";
+        case PRIMITIVE_FLOAT: return "float";
+        case PRIMITIVE_VOID:  return "void";
+        case PRIMITIVE_FIXED: return "fixed";
+        case PRIMITIVE_BOOL:  return "bool";
+    }
+    return "unknown";
+}
+
+static void printTypeInline(Node *type);
+
+static void printQualifierSuffix(Node *qualifier)
+{
+    if (!qualifier || qualifier->type != NODE_TYPE_QUALIFIER) return;
+
+    switch (qualifier->typeQualifier.kind)
+    {
+        case QUAL_POINTER:  printf("*"); break;
+        case QUAL_CONST:    printf(" const"); break;
+        case QUAL_VOLATILE: printf(" volatile"); break;
+        case QUAL_ARRAY:    printf("[%d]", qualifier->typeQualifier.arraySize); break;
+        case QUAL_FUNCTION:
+            printf("(");
+            for (int i = 0; i < qualifier->typeQualifier.funcQual.paramCount; i++)
+            {
+                if (i > 0) printf(", ");
+                printTypeInline(qualifier->typeQualifier.funcQual.params[i]);
+            }
+            printf(")");
+            break;
+        default:
+            printf("?");
+            break;
+    }
+}
+
+static void printTypeInline(Node *type)
+{
+    if (!type) return;
+
+    switch (type->type)
+    {
+        case NODE_TYPE:
+            printTypeInline(type->typeNode.innerType);
+            printQualifierSuffix(type->typeNode.qualifier);
+            break;
+        case NODE_PRIMITIVE:
+            printf("%s", primitiveTypeToString(type->primitiveType.type));
+            break;
+        case NODE_TYPEREF:
+            printf("%s", type->typeRef.name);
+            break;
+        default:
+            printf("<not a type>");
+            break;
+    }
+}
+
 void printNode(Node *node, int depth) //STUB implement all nodes
 {
     if (!node) return;
@@ -116,14 +179,36 @@ void printNode(Node *node, int depth) //STUB implement all nodes
         case NODE_BOOL_LITERAL:
             printf("Bool: %s\n", node->boolLiteral.value ? "true" : "false");
             break;
+
+        case NODE_TYPE:
+        case NODE_PRIMITIVE:
+        case NODE_TYPEREF:
+            printf("Type: ");
+            printTypeInline(node);
+            printf("\n");
+            break;
+
+        case NODE_TYPE_QUALIFIER:
+            printf("Qualifier:");
+            printQualifierSuffix(node);
+            printf("\n");
+            break;
+
+        case NODE_TYPE_DECL:
+            printf("Typedef: %s = ", node->typeDecl.aliasName);
+            printTypeInline(node->typeDecl.underlyingInstance);
+            printf("\n");
+            break;
         
         case NODE_VAR:
             printf("Var: %s\n", node->var.name);
             break;
 
         case NODE_VAR_DECL:
-            printf("VarDecl: %s\n", node->varDecl.name);
-            if(node->varDecl.value != NULL) printNode(node->varDecl.value, depth + 1);
+            printf("VarDecl\n");
+            printNode(node->varDecl.type, depth + 1);
+            printNode(node->varDecl.var, depth + 1);
+            printNode(node->varDecl.valueExpr, depth + 1);
             break;
 
         case NODE_BINARY_EXPR:
@@ -163,7 +248,8 @@ void printNode(Node *node, int depth) //STUB implement all nodes
             break;
 
         case NODE_CAST:
-            printf("Cast: %s\n", node->cast.type);
+            printf("Cast\n");
+            printNode(node->cast.type, depth + 1);
             printNode(node->cast.exp, depth + 1);
             break;
 
@@ -216,6 +302,8 @@ void printNode(Node *node, int depth) //STUB implement all nodes
                 printf("|");
                 printf("Import: %s\n", node->program.imports[i]);
             }
+            for (int i = 0; i < node->program.globalCount; i++)
+                printNode(node->program.globals[i], depth + 1);
             for (int i = 0; i < node->program.functionCount; i++)
                 printNode(node->program.functions[i], depth + 1);
             break;

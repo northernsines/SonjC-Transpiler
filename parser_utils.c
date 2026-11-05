@@ -26,24 +26,34 @@ void parserError(const char *message, ...)
     va_end(args);
 }
 
-bool isTypeName(Token *t)
-{ //STUB, expand with all type names in lang
+bool primitiveFromToken(Token *t, PrimitiveType *out)
+{ //expand with all PRIMITIVE type names in lang
     if(t->type != TOKEN_KEYWORD) return false;
-    bool returnBool =
-    !strcmp(t->text, "int") ||
-    !strcmp(t->text, "float") ||
-    !strcmp(t->text, "double") ||
-    !strcmp(t->text, "char") ||
-    !strcmp(t->text, "bool") ||
-    !strcmp(t->text, "string") ||
-    !strcmp(t->text, "size_t") ||
-    !strcmp(t->text, "void") ||
-    !strcmp(t->text, "short") ||
-    !strcmp(t->text, "long") ||
-    !strcmp(t->text, "signed") ||
-    !strcmp(t->text, "unsigned") ||
-    !strcmp(t->text, "fixed");
-    return returnBool;
+
+    PrimitiveType primitive;
+    if      (!strcmp(t->text, "int"))   primitive = PRIMITIVE_INT;
+    else if (!strcmp(t->text, "char"))  primitive = PRIMITIVE_CHAR;
+    else if (!strcmp(t->text, "float")) primitive = PRIMITIVE_FLOAT;
+    else if (!strcmp(t->text, "void"))  primitive = PRIMITIVE_VOID;
+    else if (!strcmp(t->text, "fixed")) primitive = PRIMITIVE_FIXED;
+    else if (!strcmp(t->text, "bool"))  primitive = PRIMITIVE_BOOL;
+    else return false;
+
+    if (out) *out = primitive;
+    return true;
+}
+
+bool isTypeName(Parser *p, Token *t)
+{
+    if (primitiveFromToken(t, NULL)) return true;
+
+    if (t->type == TOKEN_IDENTIFIER && p != NULL)
+    {
+        for (int i = 0; i < p->defTypeCount; i++)
+            if (!strcmp(p->defTypes[i], t->text)) return true;
+    }
+
+    return false;
 }
 
 const char *tokenTypeName(TokenType t)
@@ -65,7 +75,7 @@ const char *tokenTypeName(TokenType t)
 
 Token consume(Parser *p, TokenType expectedType, const char *expectedText, const char *context)
 {
-    if (p->pos > p->tokenCount)
+    if (p->pos >= p->tokenCount)
         parserError("%s — reached end of file", context);
 
     Token tok = CUR(p);
@@ -86,7 +96,7 @@ Token consume(Parser *p, TokenType expectedType, const char *expectedText, const
 
 void skip(Parser *p, const char *context)
 {
-    if (p->pos > p->tokenCount) parserError("%s (reached end of file)", context);
+    if (p->pos >= p->tokenCount) parserError("%s (reached end of file)", context);
     p->pos++;
 }
 

@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
     if (opts.printTok) printTokenStream(tokenArray, tokens);
 
     initRules();
-    Parser parser = { .tokens = tokenArray, .tokenCount = tokens, .pos = 0 };
+    Parser parser = { .tokens = tokenArray, .tokenCount = tokens, .pos = 0, .defTypes = NULL, .defTypeCount = 0 };
     Node *ast = parse(&parser);
     if (opts.printAst) printNode(ast, 0);
 

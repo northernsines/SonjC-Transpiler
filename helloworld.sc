@@ -1,9 +1,17 @@
 import io;
 
+typedef object {
+    int num = 1;
+    char* str = "default";
+} NewType;
+
 main()
 {
-    typedef int jerry;
-    jerry condition;
-    if(condition) print("hello world");
-    else print("goodbye world");
+    NewType* myObject = malloc(300);
+    if (myObject.num == 0) {
+        forever {
+            print(myObject.str);
+        }
+    }
+    else print("else");
 }

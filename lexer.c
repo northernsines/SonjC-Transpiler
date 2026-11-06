@@ -53,6 +53,10 @@ bool isKeyword(char *text) //STUB add all keywords
         !strcmp(text, "void") ||
         !strcmp(text, "const") ||
         !strcmp(text, "volatile") ||
+        !strcmp(text, "raw") ||
+        !strcmp(text, "unsigned") ||
+        !strcmp(text, "long") ||
+        !strcmp(text, "short") ||
         !strcmp(text, "static") ||
         !strcmp(text, "extern") ||
         !strcmp(text, "auto") ||

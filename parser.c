@@ -15,8 +15,11 @@ Node *handleCodeBlock(Parser*);
 Node *parseType(Parser*);
 Node *handleTypedef(Parser*);
 Node *handleGlobal(Parser*);
+Node *handleObjectDecl(Parser*, bool);
+Node *handleFunction(Parser*, Node*);
+Node *handleVarDeclWithType(Parser*, Node*);
 
-Node *handleLiteral(Parser *p)
+Node *handleLiteral(Parser *p) //create literal node, Q16.16 encoding algorithm
 {
     Token t = CUR(p);
     Node *literal = malloc(sizeof(Node));
@@ -42,8 +45,13 @@ Node *handleLiteral(Parser *p)
     {
         literal->floatLiteral.value = atof(str);
     }
-    else if(literal->type == NODE_FIXED_LITERAL) // Q32.32 fixed point algorithm
+    else if(literal->type == NODE_FIXED_LITERAL) // Q16.16 fixed point algorithm
     {
+        if (strSize > 0 && str[strSize - 1] == 'f') //drop the fixed marker before splitting the number
+        {
+            str[--strSize] = '\0';
+        }
+
         int i;
         char *intPartStr = malloc(strlen(str) + 1);
         char *fracPartStr = malloc(strlen(str) + 1);
@@ -75,10 +83,10 @@ Node *handleLiteral(Parser *p)
         uint64_t fracDigits = strtoull(fracPartStr, NULL, 10);
         size_t fracLen = strlen(fracPartStr);
 
-        __uint128_t scaled = (__uint128_t)fracDigits << 32; 
-        uint64_t fracPart = (uint64_t)(scaled / pow10(fracLen)); // pow10 = your own int pow
+        __uint128_t scaled = (__uint128_t)fracDigits << 16; 
+        uint32_t fracPart = (uint32_t)(scaled / pow10(fracLen)); // pow10 = your own int pow
 
-        uint64_t underlying = (intPart << 32) | fracPart; 
+        uint32_t underlying = ((uint32_t)intPart << 16) | fracPart; 
         literal->fixedLiteral.value = underlying;
     }
     else if(literal->type == NODE_CHAR_LITERAL)
@@ -98,14 +106,16 @@ Node *handleLiteral(Parser *p)
     return literal;
 }
 
-static bool isTypeQualifierStart(Parser *p)
+static bool isTypeQualifierStart(Parser *p) //check if simple tag qualifier
 {
     return IS_OPEN_PAREN(p) || IS_OPEN_BRACKET(p) ||
            IS_OP(p, "*") ||
-           IS_KEYWORD(p, "const") || IS_KEYWORD(p, "volatile");
+           IS_KEYWORD(p, "const") || IS_KEYWORD(p, "volatile") ||
+           IS_KEYWORD(p, "raw") || IS_KEYWORD(p, "unsigned") ||
+           IS_KEYWORD(p, "long") || IS_KEYWORD(p, "short");
 }
 
-static Node *makeSimpleQualifier(SimpleQualifier simpleQual, QualifierKind kind)
+static Node *makeSimpleQualifier(SimpleQualifier simpleQual, QualifierKind kind) //simple tag qualifier that doesn't contain further data
 {
     Node *qualifier = malloc(sizeof(Node));
     qualifier->type = NODE_TYPE_QUALIFIER;
@@ -114,7 +124,32 @@ static Node *makeSimpleQualifier(SimpleQualifier simpleQual, QualifierKind kind)
     return qualifier;
 }
 
-static Node *handleArrayQualifier(Parser *p)
+static Node *makePrimitiveType(PrimitiveType primitive) //bare primitive type node
+{
+    Node *type = malloc(sizeof(Node));
+    type->type = NODE_PRIMITIVE;
+    type->primitiveType.type = primitive;
+    return type;
+}
+
+static void registerDefType(Parser *p, char *name) //track user-defined type names for isTypeName
+{
+    p->defTypes = realloc(p->defTypes, sizeof(char*) * (p->defTypeCount + 1));
+    p->defTypes[p->defTypeCount++] = name;
+}
+
+static Node *innermostType(Node *type) //skip qualifiers that still describe the base type
+{
+    while (type && type->type == NODE_TYPE)
+    {
+        QualifierKind kind = type->typeNode.qualifier->typeQualifier.kind;
+        if (kind == QUAL_POINTER || kind == QUAL_ARRAY || kind == QUAL_FUNCTION) break;
+        type = type->typeNode.innerType;
+    }
+    return type;
+}
+
+static Node *handleArrayQualifier(Parser *p) //qualifier for stack array
 {
     Node *qualifier = malloc(sizeof(Node));
     qualifier->type = NODE_TYPE_QUALIFIER;
@@ -128,7 +163,7 @@ static Node *handleArrayQualifier(Parser *p)
     return qualifier;
 }
 
-static Node *handleFuncQualifier(Parser *p)
+static Node *handleFuncQualifier(Parser *p) //type qualifier for function pointer
 {
     Node *qualifier = malloc(sizeof(Node));
     qualifier->type = NODE_TYPE_QUALIFIER;
@@ -201,6 +236,30 @@ static Node *handleTypeQualifier(Parser *p) //starts on qualifier, consumes qual
         skip(p, "advancing past volatile in type");
         return qualifier;
     }
+    if (IS_KEYWORD(p, "raw"))
+    {
+        Node *qualifier = makeSimpleQualifier(SQ_RAW, QUAL_RAW);
+        skip(p, "advancing past raw in type");
+        return qualifier;
+    }
+    if (IS_KEYWORD(p, "unsigned"))
+    {
+        Node *qualifier = makeSimpleQualifier(SQ_UNSIGNED, QUAL_UNSIGNED);
+        skip(p, "advancing past unsigned in type");
+        return qualifier;
+    }
+    if (IS_KEYWORD(p, "long"))
+    {
+        Node *qualifier = makeSimpleQualifier(SQ_LONG, QUAL_LONG);
+        skip(p, "advancing past long in type");
+        return qualifier;
+    }
+    if (IS_KEYWORD(p, "short"))
+    {
+        Node *qualifier = makeSimpleQualifier(SQ_SHORT, QUAL_SHORT);
+        skip(p, "advancing past short in type");
+        return qualifier;
+    }
 
     return NULL;
 }
@@ -213,9 +272,7 @@ Node *parseType(Parser *p) // type -> [type (qualifier)], can parse itself throu
 
     if (primitiveFromToken(&base, &primitive))
     {
-        currentType = malloc(sizeof(Node));
-        currentType->type = NODE_PRIMITIVE;
-        currentType->primitiveType.type = primitive;
+        currentType = makePrimitiveType(primitive);
         skip(p, "expected qualifier or name after type");
     }
     else if (base.type == TOKEN_IDENTIFIER)
@@ -240,24 +297,38 @@ Node *parseType(Parser *p) // type -> [type (qualifier)], can parse itself throu
             parserError("Adjacent array brackets are not allowed; typedef an array first");
 
         Node *qualifier = handleTypeQualifier(p);
+        QualifierKind kind = qualifier->typeQualifier.kind;
+
+        if (kind == QUAL_RAW &&
+            !(currentType->type == NODE_TYPE &&
+              currentType->typeNode.qualifier->typeQualifier.kind == QUAL_POINTER))
+            parserError("raw must qualify a pointer at position %d", p->pos);
+
+        if (kind == QUAL_UNSIGNED || kind == QUAL_LONG || kind == QUAL_SHORT)
+        {
+            Node *baseType = innermostType(currentType);
+            if (!baseType || baseType->type != NODE_PRIMITIVE)
+                parserError("unsigned, long, and short must qualify a base type at position %d", p->pos);
+        }
+
         Node *wrapped = malloc(sizeof(Node));
         wrapped->type = NODE_TYPE;
         wrapped->typeNode.innerType = currentType;
         wrapped->typeNode.qualifier = qualifier;
 
         currentType = wrapped;
-        previousKind = qualifier->typeQualifier.kind;
+        previousKind = kind;
         hasPreviousQualifier = true;
     }
 
     return currentType;
 }
 
-Node *handleVarDecl(Parser *p) //create var declaration in the format varDecl -> [type name (expr)]
+Node *handleVarDeclWithType(Parser *p, Node *type) //var declaration with an already parsed type, starts on name
 {
     Node *varDecl = malloc(sizeof(Node));
     varDecl->type = NODE_VAR_DECL;
-    varDecl->varDecl.type = parseType(p);
+    varDecl->varDecl.type = type;
 
     Node *outerType = varDecl->varDecl.type;
     if (outerType->type == NODE_TYPE &&
@@ -284,25 +355,99 @@ Node *handleVarDecl(Parser *p) //create var declaration in the format varDecl ->
     return varDecl;
 }
 
-Node *handleTypedef(Parser *p)
+Node *handleVarDecl(Parser *p) //create var declaration in the format varDecl -> [type name (expr)]
+{
+    return handleVarDeclWithType(p, parseType(p));
+}
+
+static Node *handleObjectMember(Parser *p) //field or method, starts on member type
+{
+    Node *type = parseType(p);
+
+    if (IS_IDENTIFIER(p) && NEXT_PUNCT(p, "("))
+        return handleFunction(p, type); //p still sits on the method name
+
+    Node *field = handleVarDeclWithType(p, type);
+    consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after field declaration");
+    return field;
+}
+
+Node *handleObjectDecl(Parser *p, bool requireName) //object type/template, leaves pos after closing }
+{
+    Node *object = malloc(sizeof(Node));
+    object->type = NODE_OBJECT_DECL;
+    object->objectDecl.name = NULL;
+
+    consume(p, TOKEN_KEYWORD, "object", "Expected object");
+
+    if (IS_IDENTIFIER(p))
+    {
+        Token nameTok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected object name");
+        object->objectDecl.name = nameTok.text;
+        registerDefType(p, nameTok.text); //register before the body so members can self-reference
+    }
+    else if (requireName)
+    {
+        parserError("Expected object name at position %d", p->pos);
+    }
+
+    consume(p, TOKEN_PUNCTUATION, "{", "Expected { to begin object body");
+
+    int memberCap = 8;
+    Node **members = malloc(sizeof(Node*) * memberCap);
+    int memberCount = 0;
+
+    while (!IS_CLOSE_BRACE(p))
+    {
+        if (p->pos >= p->tokenCount || CUR(p).type == TOKEN_EOF)
+            parserError("Expected } before end of file in object body");
+
+        if (memberCount >= memberCap)
+        {
+            memberCap *= 2;
+            members = realloc(members, sizeof(Node*) * memberCap);
+        }
+        members[memberCount++] = handleObjectMember(p);
+    }
+
+    consume(p, TOKEN_PUNCTUATION, "}", "Expected } to close object body");
+
+    object->objectDecl.members = members;
+    object->objectDecl.memberCount = memberCount;
+    return object;
+}
+
+Node *handleTypedef(Parser *p) //type aliasing statement
 {
     Node *typeDecl = malloc(sizeof(Node));
     typeDecl->type = NODE_TYPE_DECL;
 
     consume(p, TOKEN_KEYWORD, "typedef", "Expected typedef");
+
+    if (IS_KEYWORD(p, "object")) //object templates can be anonymous or named inside the typedef
+    {
+        typeDecl->typeDecl.underlyingInstance = handleObjectDecl(p, false);
+
+        Token aliasTok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected typedef alias name");
+        consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after typedef");
+        typeDecl->typeDecl.aliasName = aliasTok.text;
+        registerDefType(p, aliasTok.text);
+
+        return typeDecl;
+    }
+
     typeDecl->typeDecl.underlyingInstance = parseType(p);
 
     Token aliasTok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected typedef alias name");
     consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after typedef");
     typeDecl->typeDecl.aliasName = aliasTok.text;
 
-    p->defTypes = realloc(p->defTypes, sizeof(char*) * (p->defTypeCount + 1));
-    p->defTypes[p->defTypeCount++] = aliasTok.text;
+    registerDefType(p, aliasTok.text);
 
     return typeDecl;
 }
 
-Node *handleParam(Parser *p, bool declaration)
+Node *handleParam(Parser *p, bool declaration) //redirect to proper function
 {
     if (declaration) return handleVarDecl(p);
     if (IS_LITERAL(p)) return handleLiteral(p);
@@ -377,7 +522,7 @@ Node* ledCall(Parser *p, Node *left) //build call expression, ( was already skip
     return exp;
 }
 
-Node* nudCast(Parser *p)
+Node* nudCast(Parser *p) //build cast expression
 {
     Node *castExp = malloc(sizeof(Node));
 
@@ -594,12 +739,24 @@ Node *parseExpression(Parser *p, int rbp) //parses the actual stream of expressi
     return left;
 }
 
-Node *handleForeverStatement(Parser *p) {
+Node *handleForeverStatement(Parser *p) 
+{
     Node* foreverStmt = malloc(sizeof(Node));
     foreverStmt->type = NODE_FOREVER_STMT;
     consume(p, TOKEN_KEYWORD, "forever", "expected forever statement");
     foreverStmt->foreverLoop.logic = handleStatement(p);
     return foreverStmt;
+}
+
+Node *handleSingleArgLoop(Parser *p) {
+    Node* loopStmt = malloc(sizeof(Node));
+    if (IS_KEYWORD(p, "while"))     {loopStmt->type = NODE_WHILE_STMT;  consume(p, TOKEN_KEYWORD, "while", "expected while statement");}
+    if (IS_KEYWORD(p, "until"))     {loopStmt->type = NODE_UNTIL_STMT;  consume(p, TOKEN_KEYWORD, "until", "expected until statement");}
+    if (IS_KEYWORD(p, "repeat"))    {loopStmt->type = NODE_REPEAT_STMT; consume(p, TOKEN_KEYWORD, "repeat", "expected repeat statement");}
+    consume(p, TOKEN_PUNCTUATION, "(", "Expected ( after loop");
+    loopStmt->singleArgLoop.expr = parseExpression(p, 0);
+    consume(p, TOKEN_PUNCTUATION, ")", "Expected ) after loop condition");
+    loopStmt->singleArgLoop.logic = handleStatement(p);
 }
 
 Node *handleIfStatement(Parser *p)
@@ -656,7 +813,14 @@ Node *handleStatement(Parser *p) //starts on whatever is after ; or }
     if (IS_KEYWORD(p, "if")) return handleIfStatement(p);
     if (IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif")) parserError("Expected opening if statement to else or elif at position %d", p->pos);
     if (IS_KEYWORD(p, "forever")) return handleForeverStatement(p);
+    if (IS_KEYWORD(p, "until") || IS_KEYWORD(p, "while") || IS_KEYWORD(p, "repeat")) return handleSingleArgLoop(p);
     if (IS_KEYWORD(p, "typedef")) return handleTypedef(p);
+    if (IS_KEYWORD(p, "object"))
+    {
+        Node *decl = handleObjectDecl(p, true);
+        consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after object declaration");
+        return decl;
+    }
     if (isTypeName(p, &CUR(p)))
     {
         Node *decl = handleVarDecl(p);
@@ -712,30 +876,32 @@ Node *handleGlobal(Parser *p)
     return global;
 }
 
-Node *handleFunction(Parser *p)
+Node *handleFunction(Parser *p, Node *returnType) //starts on function name, return type already parsed
 {
     Node *function = malloc(sizeof(Node));
     function->type = NODE_FUNCTION_DECL;
+    function->functionDecl.returnType = returnType;
     function->functionDecl.name = CUR(p).text;
-
-    if (p->pos > 0 &&
-        (p->tokens[p->pos - 1].type == TOKEN_KEYWORD ||
-         p->tokens[p->pos - 1].type == TOKEN_IDENTIFIER))
-        function->functionDecl.returnType = p->tokens[p->pos - 1].text;
-    else
-        function->functionDecl.returnType = "void";
 
     int paramCount;
     Node **params = handleArgList(p, true, &paramCount);
     function->functionDecl.paramCount = paramCount;
     function->functionDecl.params = params;
 
-    if (!IS_OPEN_BRACE(p)) parserError("Expected { to begin function body at position %d", p->pos);
-    function->functionDecl.body = handleCodeBlock(p);
+    if (IS_OPEN_BRACE(p))
+    {
+        function->functionDecl.body = handleCodeBlock(p);
+    }
+    else
+    {
+        consume(p, TOKEN_PUNCTUATION, ";", "Expected { or ; after function declaration");
+        function->functionDecl.body = NULL;
+    }
+
     return function;
 }
 
-Node *parse(Parser *p) //STUB: ADD PREPROCESSOR DIRECTIVES | main parsing loop
+Node *parse(Parser *p)
 {
     int importCount = 0;
     int functionCount = 0;
@@ -762,27 +928,35 @@ Node *parse(Parser *p) //STUB: ADD PREPROCESSOR DIRECTIVES | main parsing loop
             continue;
         }
 
-        if (IS_IDENTIFIER(p) && NEXT_PUNCT(p, "("))
+        if (IS_KEYWORD(p, "object"))
+        {
+            Node *object = handleObjectDecl(p, true);
+            consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after object declaration");
+            if (globalCount >= globalCap) { globalCap *= 2; globals = realloc(globals, sizeof(Node*) * globalCap); }
+            globals[globalCount++] = object;
+            continue;
+        }
+
+        if (IS_IDENTIFIER(p) && NEXT_PUNCT(p, "(")) //untyped function, implicit void return
         {
             if (functionCount >= functionCap) { functionCap *= 2; functions = realloc(functions, sizeof(Node*) * functionCap); }
-            functions[functionCount++] = handleFunction(p);
+            functions[functionCount++] = handleFunction(p, makePrimitiveType(PRIMITIVE_VOID));
             continue;
         }
 
         if (isTypeName(p, &CUR(p)))
         {
-            bool isSimpleFunction =
-                NEXT_IDENTIFIER(p) &&
-                p->pos + 2 < p->tokenCount &&
-                p->tokens[p->pos + 2].type == TOKEN_PUNCTUATION &&
-                !strcmp(p->tokens[p->pos + 2].text, "(");
+            int start = p->pos;
+            Node *type = parseType(p);
 
-            if (isSimpleFunction)
+            if (IS_IDENTIFIER(p) && NEXT_PUNCT(p, "("))
             {
-                p->pos++;
+                if (functionCount >= functionCap) { functionCap *= 2; functions = realloc(functions, sizeof(Node*) * functionCap); }
+                functions[functionCount++] = handleFunction(p, type);
                 continue;
             }
 
+            p->pos = start;
             if (globalCount >= globalCap) { globalCap *= 2; globals = realloc(globals, sizeof(Node*) * globalCap); }
             globals[globalCount++] = handleGlobal(p);
             continue;
@@ -792,7 +966,7 @@ Node *parse(Parser *p) //STUB: ADD PREPROCESSOR DIRECTIVES | main parsing loop
     }
 
     Node *programNode = malloc(sizeof(Node));
-    *programNode = (Node){
+    *programNode = (Node) {
         .type = NODE_PROGRAM,
         .program = {
             .imports = imports,

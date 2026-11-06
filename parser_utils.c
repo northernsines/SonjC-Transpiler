@@ -43,6 +43,21 @@ bool primitiveFromToken(Token *t, PrimitiveType *out)
     return true;
 }
 
+static const PrimitiveInfo primitiveTable[PRIMITIVE_COUNT] = {
+    [PRIMITIVE_INT]   = { .bitWidth = 32, .isSigned = true,  .fracBits = 0  },
+    [PRIMITIVE_CHAR]  = { .bitWidth = 8,  .isSigned = false, .fracBits = 0  },
+    [PRIMITIVE_FLOAT] = { .bitWidth = 32, .isSigned = true,  .fracBits = 0  },
+    [PRIMITIVE_VOID]  = { .bitWidth = 0,  .isSigned = false, .fracBits = 0  },
+    [PRIMITIVE_FIXED] = { .bitWidth = 32, .isSigned = true,  .fracBits = 16 },
+    [PRIMITIVE_BOOL]  = { .bitWidth = 8,  .isSigned = false, .fracBits = 0  },
+};
+
+const PrimitiveInfo *primitiveInfoFor(PrimitiveType type) //metadata for primitive widths and signedness
+{
+    if (type < 0 || type >= PRIMITIVE_COUNT) return NULL;
+    return &primitiveTable[type];
+}
+
 bool isTypeName(Parser *p, Token *t)
 {
     if (primitiveFromToken(t, NULL)) return true;

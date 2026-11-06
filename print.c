@@ -94,6 +94,7 @@ static const char *primitiveTypeToString(PrimitiveType type)
         case PRIMITIVE_VOID:  return "void";
         case PRIMITIVE_FIXED: return "fixed";
         case PRIMITIVE_BOOL:  return "bool";
+        case PRIMITIVE_COUNT: break;
     }
     return "unknown";
 }
@@ -109,6 +110,10 @@ static void printQualifierSuffix(Node *qualifier)
         case QUAL_POINTER:  printf("*"); break;
         case QUAL_CONST:    printf(" const"); break;
         case QUAL_VOLATILE: printf(" volatile"); break;
+        case QUAL_UNSIGNED: printf(" unsigned"); break;
+        case QUAL_RAW:      printf(" raw"); break;
+        case QUAL_LONG:     printf(" long"); break;
+        case QUAL_SHORT:    printf(" short"); break;
         case QUAL_ARRAY:    printf("[%d]", qualifier->typeQualifier.arraySize); break;
         case QUAL_FUNCTION:
             printf("(");
@@ -165,7 +170,7 @@ void printNode(Node *node, int depth) //STUB implement all nodes
             break;
 
         case NODE_FIXED_LITERAL:
-            printf("Fixed: %" PRIu64 "\n", node->fixedLiteral.value);
+            printf("Fixed: %" PRIu32 "\n", node->fixedLiteral.value);
             break;
 
         case NODE_CHAR_LITERAL:
@@ -195,9 +200,25 @@ void printNode(Node *node, int depth) //STUB implement all nodes
             break;
 
         case NODE_TYPE_DECL:
-            printf("Typedef: %s = ", node->typeDecl.aliasName);
-            printTypeInline(node->typeDecl.underlyingInstance);
-            printf("\n");
+            printf("Typedef: %s =", node->typeDecl.aliasName);
+            if (node->typeDecl.underlyingInstance &&
+                node->typeDecl.underlyingInstance->type == NODE_OBJECT_DECL)
+            {
+                printf("\n");
+                printNode(node->typeDecl.underlyingInstance, depth + 1);
+            }
+            else
+            {
+                printf(" ");
+                printTypeInline(node->typeDecl.underlyingInstance);
+                printf("\n");
+            }
+            break;
+
+        case NODE_OBJECT_DECL:
+            printf("ObjectDecl: %s\n", node->objectDecl.name ? node->objectDecl.name : "<anonymous>");
+            for (int i = 0; i < node->objectDecl.memberCount; i++)
+                printNode(node->objectDecl.members[i], depth + 1);
             break;
         
         case NODE_VAR:
@@ -277,9 +298,9 @@ void printNode(Node *node, int depth) //STUB implement all nodes
             break;
 
         case NODE_FUNCTION_DECL:
-            printf("FunctionDecl: %s returns %s\n",
-                   node->functionDecl.name,
-                   node->functionDecl.returnType);
+            printf("FunctionDecl: %s returns ", node->functionDecl.name);
+            printTypeInline(node->functionDecl.returnType);
+            printf("\n");
             if (node->functionDecl.paramCount == 0)
             {
                 for (int i = 0; i < depth + 1; i++) printf("____");

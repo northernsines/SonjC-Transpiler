@@ -42,7 +42,7 @@ typedef enum {
     NODE_CONTINUE_STMT,
     NODE_GOTO_STMT,
     NODE_LABEL_STMT,
-    NODE_INSTANCE_DECL,
+    NODE_OBJECT_DECL,
     NODE_MEMBER_EXPR,
     NODE_INDEX_EXPR,
     NODE_BOOL_LITERAL,
@@ -120,8 +120,15 @@ typedef enum {
     PRIMITIVE_VOID, //technically a primitive type, will be flagged in analyzer if without qualifiers.
     PRIMITIVE_FIXED,
     PRIMITIVE_BOOL,
+    PRIMITIVE_COUNT,
     //STUB, add all primitive types
 } PrimitiveType; //primitive, built in types
+
+typedef struct {
+    int bitWidth;
+    bool isSigned;
+    int fracBits;
+} PrimitiveInfo;
 
 typedef struct {
     Token *tokens;
@@ -137,6 +144,9 @@ typedef enum {
     SQ_VOLATILE,
     SQ_UNSIGNED,
     SQ_SIGNED,
+    SQ_RAW,
+    SQ_LONG,
+    SQ_SHORT,
 } SimpleQualifier; //type qualifiers that don't need to carry any
 
 typedef enum {
@@ -145,6 +155,9 @@ typedef enum {
     QUAL_VOLATILE,
     QUAL_UNSIGNED,
     QUAL_SIGNED,
+    QUAL_RAW,
+    QUAL_LONG,
+    QUAL_SHORT,
     QUAL_ARRAY,
     QUAL_FUNCTION,
 } QualifierKind;
@@ -163,11 +176,11 @@ typedef struct Node{
         } program;
 
         struct { // function declaration
-            char *returnType;
+            struct Node *returnType;
             char *name;
             struct Node **params;
             int paramCount;
-            struct Node *body;
+            struct Node *body; //NULL for prototype-only declarations
         } functionDecl;
 
         struct { // variable declaration
@@ -182,13 +195,11 @@ typedef struct Node{
 
         } typeDecl;
 
-        struct { // instance declaration
+        struct { // object type/template declaration
             char *name;
-            struct Node **fields;
-            int fieldCount;
-            struct Node **methods;
-            int methodCount;
-        } instanceDecl;
+            struct Node **members;
+            int memberCount;
+        } objectDecl;
 
         struct { // block
             struct Node **statements;
@@ -261,7 +272,7 @@ typedef struct Node{
         } floatLiteral;
 
         struct { // fixed literal
-            __uint64_t value;
+            uint32_t value;
         } fixedLiteral;
 
         struct { // char literal
@@ -386,6 +397,7 @@ Node *parse(Parser *p);
 //utility functions (implemented in parser_utils.c)
 void parserError(const char *message, ...);
 bool primitiveFromToken(Token *t, PrimitiveType *out);
+const PrimitiveInfo *primitiveInfoFor(PrimitiveType type);
 bool isTypeName(Parser *p, Token *t);
 const char *tokenTypeName(TokenType t);
 Token consume(Parser *p, TokenType expectedType, const char *expectedText, const char *context);

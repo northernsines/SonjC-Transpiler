@@ -197,10 +197,9 @@ int skipComment(Lexer *lexer)
         {
             if(currentChar == '\0') return 2;
             currentChar = lexer->source[lexer->pos];
-            advance(lexer);
         }
 
-        skipNewline(lexer);
+        newLine(lexer);
         return 1;
     }
     else if (currentChar == '*')

@@ -248,6 +248,10 @@ typedef struct Node{
             int argCount;
         } callExpr;
 
+        struct {
+            struct Node *expr;
+        } returnStmt;
+
         struct { // member access (. or ->)
             struct Node *object;
             char *member;
@@ -411,6 +415,7 @@ void initRules(void);
 
 //pratt parsing functions referenced by initRules (implemented in parser.c)
 Node* nudUnary(Parser *p);
+Node* nudSizeof(Parser *p);
 Node* nudCast(Parser *p);
 Node* nudParen(Parser *p);
 Node* nudAddress(Parser *p);

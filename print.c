@@ -290,6 +290,29 @@ void printNode(Node *node, int depth) //STUB implement all nodes
             printf("ElseStmt\n");
             printNode(node->elseStmt.logic, depth + 1);
             break;
+        
+        case NODE_RETURN_STMT:
+            printf("ReturnStmt\n");
+            printNode(node->returnStmt.expr, depth + 1);
+            break;
+
+        case NODE_WHILE_STMT:
+            printf("WhileStmt\n");
+            printNode(node->singleArgLoop.expr, depth + 1);
+            printNode(node->singleArgLoop.logic, depth + 1);
+            break;
+
+        case NODE_REPEAT_STMT:
+            printf("RepeatStmt\n");
+            printNode(node->singleArgLoop.expr, depth + 1);
+            printNode(node->singleArgLoop.logic, depth + 1);
+            break;
+        
+        case NODE_UNTIL_STMT:
+            printf("UntilStmt\n");
+            printNode(node->singleArgLoop.expr, depth + 1);
+            printNode(node->singleArgLoop.logic, depth + 1);
+            break;
 
         case NODE_BLOCK:
             printf("Block\n");

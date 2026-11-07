@@ -510,7 +510,7 @@ void initRules(void) // building the operator table
         .type = NODE_OPERATOR,
         .operator = {
             .lbp = 140,
-            .nud = nudUnary,
+            .nud = nudSizeof,
             .led = NULL,
         }
     };

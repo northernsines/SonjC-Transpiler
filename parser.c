@@ -561,6 +561,45 @@ Node* nudUnary(Parser *p) //build unary expression with prefix operator
     return exp;
 }
 
+Node* nudSizeof(Parser *p) //build sizeof expression, operand may be (type) or an expression
+{
+    Node *exp = malloc(sizeof(Node));
+    Node *op = malloc(sizeof(Node));
+
+    op->type = NODE_OPERATOR;
+    op->operator.opType = OPERATOR_SIZEOF;
+
+    exp->type = NODE_UNARY_EXPR;
+    exp->unaryExpr.operator = op;
+
+    if (IS_OPEN_PAREN(p))
+    {
+        int openPos = p->pos;
+        skip(p, "advancing past ( in sizeof");
+
+        if (isTypeName(p, &CUR(p)))
+        {
+            Node *type = parseType(p);
+            if (IS_CLOSE_PAREN(p))
+            {
+                skip(p, "advancing past ) in sizeof");
+                exp->unaryExpr.exp = type;
+                return exp;
+            }
+            p->pos = openPos; //not a type operand, reparse as an expression
+        }
+
+        exp->unaryExpr.exp = parseExpression(p, 0);
+        consume(p, TOKEN_PUNCTUATION, ")", "Expected ) to close sizeof expression");
+    }
+    else
+    {
+        exp->unaryExpr.exp = parseExpression(p, 139);
+    }
+
+    return exp;
+}
+
 Node* nudAddress(Parser *p) //build address-of expression with prefix &
 {
     Node *exp = malloc(sizeof(Node));
@@ -750,13 +789,14 @@ Node *handleForeverStatement(Parser *p)
 
 Node *handleSingleArgLoop(Parser *p) {
     Node* loopStmt = malloc(sizeof(Node));
-    if (IS_KEYWORD(p, "while"))     {loopStmt->type = NODE_WHILE_STMT;  consume(p, TOKEN_KEYWORD, "while", "expected while statement");}
-    if (IS_KEYWORD(p, "until"))     {loopStmt->type = NODE_UNTIL_STMT;  consume(p, TOKEN_KEYWORD, "until", "expected until statement");}
-    if (IS_KEYWORD(p, "repeat"))    {loopStmt->type = NODE_REPEAT_STMT; consume(p, TOKEN_KEYWORD, "repeat", "expected repeat statement");}
+    if (IS_KEYWORD(p, "while"))          {loopStmt->type = NODE_WHILE_STMT;  consume(p, TOKEN_KEYWORD, "while", "expected while statement");}
+    else if (IS_KEYWORD(p, "until"))     {loopStmt->type = NODE_UNTIL_STMT;  consume(p, TOKEN_KEYWORD, "until", "expected until statement");}
+    else if (IS_KEYWORD(p, "repeat"))    {loopStmt->type = NODE_REPEAT_STMT; consume(p, TOKEN_KEYWORD, "repeat", "expected repeat statement");}
     consume(p, TOKEN_PUNCTUATION, "(", "Expected ( after loop");
     loopStmt->singleArgLoop.expr = parseExpression(p, 0);
     consume(p, TOKEN_PUNCTUATION, ")", "Expected ) after loop condition");
     loopStmt->singleArgLoop.logic = handleStatement(p);
+    return loopStmt;
 }
 
 Node *handleIfStatement(Parser *p)
@@ -796,6 +836,16 @@ Node *handleIfStatement(Parser *p)
     return statement;
 }
 
+Node *handleReturnStatement(Parser *p)
+{
+    consume(p, TOKEN_KEYWORD, "return", "Expected return statement!");
+    Node *stmt = malloc(sizeof(Node));
+    stmt->type = NODE_RETURN_STMT;
+    stmt->returnStmt.expr = parseExpression(p, 0);
+    consume(p, TOKEN_PUNCTUATION, ";", "Expected ; to terminate statement!");
+    return stmt;
+}
+
 Node *handleExpressionStatement(Parser *p)
 {
     Node *expressionStatement = malloc(sizeof(Node));
@@ -827,6 +877,7 @@ Node *handleStatement(Parser *p) //starts on whatever is after ; or }
         consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after variable declaration");
         return decl;
     }
+    if (IS_KEYWORD(p, "return")) return handleReturnStatement(p);
     return handleExpressionStatement(p);
 }
 

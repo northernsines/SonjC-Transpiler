@@ -11,6 +11,6 @@ Declares debug printing for token streams and the AST.
 void printTokenStream(Token *tokens, int count);
 const char *tokentypeToString(TokenType type);
 const char *operatorTypeToString(OperatorType op);
-void printNode(Node *node, int depth);
+void printNode(Node *node);
 
 #endif

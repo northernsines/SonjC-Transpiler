@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
     initRules();
     Parser parser = { .tokens = tokenArray, .tokenCount = tokens, .pos = 0, .defTypes = NULL, .defTypeCount = 0 };
     Node *ast = parse(&parser);
-    if (opts.printAst) printNode(ast, 0);
+    if (opts.printAst) printNode(ast);
 
     free(source);
     return 0;

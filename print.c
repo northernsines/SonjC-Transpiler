@@ -1,6 +1,8 @@
 #include "print.h"
 #include <stdio.h>
 #include <inttypes.h>
+#include <stdarg.h>
+#include <string.h>
 
 /*
 SonjC Print
@@ -8,12 +10,100 @@ Written Sep 2026
 Debug output helpers for token streams and the abstract syntax tree.
 */
 
+#define TOKEN_TEXT_WIDTH_MAX 48
+
+static void formatTokenText(const char *text, char *out, size_t outSize)
+{
+    if (outSize == 0) return;
+    if (!text) text = "";
+
+    size_t oi = 0;
+    bool truncated = false;
+
+    for (size_t i = 0; text[i] != '\0'; i++)
+    {
+        char single[2] = { text[i], '\0' };
+        const char *rep;
+
+        switch (text[i])
+        {
+            case '\n': rep = "\\n"; break;
+            case '\t': rep = "\\t"; break;
+            case '\r': rep = "\\r"; break;
+            default:   rep = single; break;
+        }
+
+        size_t rl = strlen(rep);
+        if (oi + rl + 1 > outSize)
+        {
+            truncated = true;
+            break;
+        }
+
+        memcpy(out + oi, rep, rl);
+        oi += rl;
+    }
+
+    if (truncated && outSize >= 4)
+    {
+        size_t keep = outSize - 4;
+        if (oi > keep) oi = keep;
+        memcpy(out + oi, "...", 3);
+        oi += 3;
+    }
+
+    out[oi] = '\0';
+}
+
+static void printHorizontalRule(const char *left, const char *mid, const char *right,
+                                int idxWidth, int typeWidth, int textWidth)
+{
+    printf("%s", left);
+    for (int i = 0; i < idxWidth + 2; i++) printf("─");
+    printf("%s", mid);
+    for (int i = 0; i < typeWidth + 2; i++) printf("─");
+    printf("%s", mid);
+    for (int i = 0; i < textWidth + 2; i++) printf("─");
+    printf("%s\n", right);
+}
+
 void printTokenStream(Token *tokens, int count)
 {
+    int idxWidth = 3;
+    if (count > 0)
+    {
+        int digits = snprintf(NULL, 0, "%d", count - 1);
+        if (digits > idxWidth) idxWidth = digits;
+    }
+
+    int typeWidth = 4;
+    int textWidth = 4;
+
     for (int i = 0; i < count; i++)
     {
-        printf("[%02d] type=%s text: %s\n", i, tokentypeToString(tokens[i].type), tokens[i].text);
+        char display[TOKEN_TEXT_WIDTH_MAX + 1];
+        formatTokenText(tokens[i].text, display, sizeof(display));
+
+        int len = (int)strlen(display);
+        if (len > textWidth) textWidth = len;
     }
+
+    printHorizontalRule("┌", "┬", "┐", idxWidth, typeWidth, textWidth);
+    printf("│ %-*s │ %-*s │ %-*s │\n", idxWidth, "idx", typeWidth, "type", textWidth, "text");
+    printHorizontalRule("├", "┼", "┤", idxWidth, typeWidth, textWidth);
+
+    for (int i = 0; i < count; i++)
+    {
+        char display[TOKEN_TEXT_WIDTH_MAX + 1];
+        formatTokenText(tokens[i].text, display, sizeof(display));
+
+        printf("│ %*d │ %-*s │ %-*s │\n",
+               idxWidth, i,
+               typeWidth, tokentypeToString(tokens[i].type),
+               textWidth, display);
+    }
+
+    printHorizontalRule("└", "┴", "┘", idxWidth, typeWidth, textWidth);
     fflush(stdout);
 }
 
@@ -152,12 +242,59 @@ static void printTypeInline(Node *type)
     }
 }
 
-void printNode(Node *node, int depth) //STUB implement all nodes
+#define AST_PREFIX_MAX 1024
+
+static void printNodeAt(Node *node, const char *prefix, bool isLast, bool isRoot);
+
+static void printLeafLine(const char *prefix, bool isLast, const char *fmt, ...)
+{
+    va_list args;
+
+    printf("%s%s ", prefix, isLast ? "└──" : "├──");
+    va_start(args, fmt);
+    vprintf(fmt, args);
+    va_end(args);
+    printf("\n");
+}
+
+static void printChildArray(Node **children, int count, const char *prefix)
+{
+    int total = 0;
+    for (int i = 0; i < count; i++)
+        if (children[i]) total++;
+
+    int seen = 0;
+    for (int i = 0; i < count; i++)
+    {
+        if (!children[i]) continue;
+        seen++;
+        printNodeAt(children[i], prefix, seen == total, false);
+    }
+}
+
+#define PRINT_CHILDREN(prefix, ...)                                                  \
+    do {                                                                             \
+        Node *_children[] = { __VA_ARGS__ };                                         \
+        printChildArray(_children, (int)(sizeof(_children) / sizeof(_children[0])),  \
+                        (prefix));                                                   \
+    } while (0)
+
+static void printNodeAt(Node *node, const char *prefix, bool isLast, bool isRoot)
 {
     if (!node) return;
 
-    for (int i = 0; i < depth; i++) printf("____"); // indent per depth
-    printf("|"); //marker
+    if (!isRoot)
+        printf("%s%s ", prefix, isLast ? "└──" : "├──");
+
+    char childPrefix[AST_PREFIX_MAX];
+    if (isRoot)
+    {
+        childPrefix[0] = '\0';
+    }
+    else
+    {
+        snprintf(childPrefix, sizeof(childPrefix), "%s%s", prefix, isLast ? "    " : "│   ");
+    }
 
     switch (node->type)
     {
@@ -180,7 +317,7 @@ void printNode(Node *node, int depth) //STUB implement all nodes
         case NODE_STRING_LITERAL:
             printf("String: %s\n", node->stringLiteral.value);
             break;
-        
+
         case NODE_BOOL_LITERAL:
             printf("Bool: %s\n", node->boolLiteral.value ? "true" : "false");
             break;
@@ -205,7 +342,7 @@ void printNode(Node *node, int depth) //STUB implement all nodes
                 node->typeDecl.underlyingInstance->type == NODE_OBJECT_DECL)
             {
                 printf("\n");
-                printNode(node->typeDecl.underlyingInstance, depth + 1);
+                printNodeAt(node->typeDecl.underlyingInstance, childPrefix, true, false);
             }
             else
             {
@@ -217,142 +354,185 @@ void printNode(Node *node, int depth) //STUB implement all nodes
 
         case NODE_OBJECT_DECL:
             printf("ObjectDecl: %s\n", node->objectDecl.name ? node->objectDecl.name : "<anonymous>");
-            for (int i = 0; i < node->objectDecl.memberCount; i++)
-                printNode(node->objectDecl.members[i], depth + 1);
+            printChildArray(node->objectDecl.members, node->objectDecl.memberCount, childPrefix);
             break;
-        
+
         case NODE_VAR:
             printf("Var: %s\n", node->var.name);
             break;
 
         case NODE_VAR_DECL:
             printf("VarDecl\n");
-            printNode(node->varDecl.type, depth + 1);
-            printNode(node->varDecl.var, depth + 1);
-            printNode(node->varDecl.valueExpr, depth + 1);
+            PRINT_CHILDREN(childPrefix, node->varDecl.type, node->varDecl.var, node->varDecl.valueExpr);
             break;
 
         case NODE_BINARY_EXPR:
             printf("binaryExp: %s\n", operatorTypeToString(node->binaryExpr.operator->operator.opType));
-            printNode(node->binaryExpr.leftExp, depth + 1);
-            printNode(node->binaryExpr.rightExp, depth + 1);
+            PRINT_CHILDREN(childPrefix, node->binaryExpr.leftExp, node->binaryExpr.rightExp);
             break;
 
         case NODE_UNARY_EXPR:
             printf("unaryExp: %s\n", operatorTypeToString(node->unaryExpr.operator->operator.opType));
-            printNode(node->unaryExpr.exp, depth + 1);
+            PRINT_CHILDREN(childPrefix, node->unaryExpr.exp);
             break;
 
         case NODE_CALL_EXPR:
+        {
             printf("CallExpr\n");
-            printNode(node->callExpr.callee, depth + 1);
+
+            int total = node->callExpr.callee ? 1 : 0;
             for (int i = 0; i < node->callExpr.argCount; i++)
-                printNode(node->callExpr.args[i], depth + 1);
+                if (node->callExpr.args[i]) total++;
+
+            int seen = 0;
+            if (node->callExpr.callee)
+            {
+                seen++;
+                printNodeAt(node->callExpr.callee, childPrefix, seen == total, false);
+            }
+            for (int i = 0; i < node->callExpr.argCount; i++)
+            {
+                if (!node->callExpr.args[i]) continue;
+                seen++;
+                printNodeAt(node->callExpr.args[i], childPrefix, seen == total, false);
+            }
             break;
+        }
 
         case NODE_MEMBER_EXPR:
             printf("Member: %s%s\n", node->memberExpr.isArrow ? "->" : ".", node->memberExpr.member);
-            printNode(node->memberExpr.object, depth + 1);
+            PRINT_CHILDREN(childPrefix, node->memberExpr.object);
             break;
 
         case NODE_INDEX_EXPR:
             printf("Index\n");
-            printNode(node->indexExpr.target, depth + 1);
-            printNode(node->indexExpr.index, depth + 1);
+            PRINT_CHILDREN(childPrefix, node->indexExpr.target, node->indexExpr.index);
             break;
 
         case NODE_TERNARY_EXPR:
             printf("Ternary: ?:\n");
-            printNode(node->ternaryExpr.conditionExp, depth + 1);
-            printNode(node->ternaryExpr.ifTrueExp, depth + 1);
-            printNode(node->ternaryExpr.ifFalseExp, depth + 1);
+            PRINT_CHILDREN(childPrefix, node->ternaryExpr.conditionExp,
+                           node->ternaryExpr.ifTrueExp, node->ternaryExpr.ifFalseExp);
             break;
 
         case NODE_CAST:
             printf("Cast\n");
-            printNode(node->cast.type, depth + 1);
-            printNode(node->cast.exp, depth + 1);
+            PRINT_CHILDREN(childPrefix, node->cast.type, node->cast.exp);
             break;
 
         case NODE_EXPR_STMT:
             printf("ExprStmt\n");
-            printNode(node->exprStmt.expr, depth + 1);
+            PRINT_CHILDREN(childPrefix, node->exprStmt.expr);
             break;
 
         case NODE_IF_STMT:
             printf("IfStmt\n");
-            printNode(node->ifStmt.expr, depth + 1);
-            printNode(node->ifStmt.logic, depth + 1);
-            if(!(node->ifStmt.elseStmt == NULL)) printNode(node->ifStmt.elseStmt, depth + 1);
+            PRINT_CHILDREN(childPrefix, node->ifStmt.expr, node->ifStmt.logic, node->ifStmt.elseStmt);
             break;
-        
+
         case NODE_ELSE_STMT:
             printf("ElseStmt\n");
-            printNode(node->elseStmt.logic, depth + 1);
+            PRINT_CHILDREN(childPrefix, node->elseStmt.logic);
             break;
-        
+
         case NODE_RETURN_STMT:
             printf("ReturnStmt\n");
-            printNode(node->returnStmt.expr, depth + 1);
+            PRINT_CHILDREN(childPrefix, node->returnStmt.expr);
             break;
 
         case NODE_WHILE_STMT:
             printf("WhileStmt\n");
-            printNode(node->singleArgLoop.expr, depth + 1);
-            printNode(node->singleArgLoop.logic, depth + 1);
+            PRINT_CHILDREN(childPrefix, node->singleArgLoop.expr, node->singleArgLoop.logic);
             break;
 
         case NODE_REPEAT_STMT:
             printf("RepeatStmt\n");
-            printNode(node->singleArgLoop.expr, depth + 1);
-            printNode(node->singleArgLoop.logic, depth + 1);
+            PRINT_CHILDREN(childPrefix, node->singleArgLoop.expr, node->singleArgLoop.logic);
             break;
-        
+
         case NODE_UNTIL_STMT:
             printf("UntilStmt\n");
-            printNode(node->singleArgLoop.expr, depth + 1);
-            printNode(node->singleArgLoop.logic, depth + 1);
+            PRINT_CHILDREN(childPrefix, node->singleArgLoop.expr, node->singleArgLoop.logic);
             break;
 
         case NODE_BLOCK:
             printf("Block\n");
-            for (int i = 0; i < node->block.count; i++)
-                printNode(node->block.statements[i], depth + 1);
+            printChildArray(node->block.statements, node->block.count, childPrefix);
             break;
 
         case NODE_FUNCTION_DECL:
+        {
             printf("FunctionDecl: %s returns ", node->functionDecl.name);
             printTypeInline(node->functionDecl.returnType);
             printf("\n");
-            if (node->functionDecl.paramCount == 0)
+
+            int paramCount = node->functionDecl.paramCount;
+            int hasBody = node->functionDecl.body ? 1 : 0;
+            int total = (paramCount == 0 ? 1 : paramCount) + hasBody;
+            int seen = 0;
+
+            if (paramCount == 0)
             {
-                for (int i = 0; i < depth + 1; i++) printf("____");
-                printf("|");
-                printf("void\n");
+                seen++;
+                printLeafLine(childPrefix, seen == total, "void");
             }
             else
             {
-                for (int i = 0; i < node->functionDecl.paramCount; i++)
-                    printNode(node->functionDecl.params[i], depth + 1);
+                for (int i = 0; i < paramCount; i++)
+                {
+                    seen++;
+                    printNodeAt(node->functionDecl.params[i], childPrefix, seen == total, false);
+                }
             }
-            printNode(node->functionDecl.body, depth + 1);
+
+            if (node->functionDecl.body)
+            {
+                seen++;
+                printNodeAt(node->functionDecl.body, childPrefix, seen == total, false);
+            }
             break;
+        }
 
         case NODE_PROGRAM:
+        {
             printf("Program\n");
+
+            int total = 0;
+            for (int i = 0; i < node->program.importCount; i++)
+                if (node->program.imports[i]) total++;
+            for (int i = 0; i < node->program.globalCount; i++)
+                if (node->program.globals[i]) total++;
+            for (int i = 0; i < node->program.functionCount; i++)
+                if (node->program.functions[i]) total++;
+
+            int seen = 0;
             for (int i = 0; i < node->program.importCount; i++)
             {
-                for (int j = 0; j < depth + 1; j++) printf("____");
-                printf("|");
-                printf("Import: %s\n", node->program.imports[i]);
+                if (!node->program.imports[i]) continue;
+                seen++;
+                printLeafLine(childPrefix, seen == total, "Import: %s", node->program.imports[i]);
             }
             for (int i = 0; i < node->program.globalCount; i++)
-                printNode(node->program.globals[i], depth + 1);
+            {
+                if (!node->program.globals[i]) continue;
+                seen++;
+                printNodeAt(node->program.globals[i], childPrefix, seen == total, false);
+            }
             for (int i = 0; i < node->program.functionCount; i++)
-                printNode(node->program.functions[i], depth + 1);
+            {
+                if (!node->program.functions[i]) continue;
+                seen++;
+                printNodeAt(node->program.functions[i], childPrefix, seen == total, false);
+            }
             break;
+        }
 
         default:
             printf("Unknown node type: %d\n", node->type);
     }
+}
+
+void printNode(Node *node) //STUB implement all nodes
+{
+    printNodeAt(node, "", true, true);
 }

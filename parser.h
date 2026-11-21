@@ -238,6 +238,11 @@ typedef struct Node {
         } single_arg_loop; //while, until, repeat
 
         struct {
+            struct Node* logic;
+            struct Node* expr;
+        } do_loop; //while and until, differentiated by tag
+
+        struct {
             struct Node* source;
             struct Node* item;
             struct Node* logic;

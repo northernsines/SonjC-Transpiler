@@ -1,2 +1,21 @@
+CC = clang
+SRCS = $(wildcard *.c)
+CFLAGS = -Wall -Werror -Wno-return-type
+BUILDOPT = -O2
+DEBUGOPT = -O0
+DEBUG = -g
+OUT = transpiler
+RFLAGS = -printast -printtok
+TARGET = test.sc
+
+ .PHONY: build debug clean run
+
 build:
-	clang main.c lexer.c parser.c parser_utils.c io_utils.c print.c cli.c -o transpiler -Wall -Werror -Wno-return-type
+	$(CC) $(SRCS) $(CFLAGS) $(BUILDOPT) -o $(OUT)
+debug:
+	$(CC) $(SRCS) $(CFLAGS) $(DEBUGOPT) -o $(OUT) $(DEBUG)
+clean:
+	rm -f $(OUT)
+	rm -rf $(OUT).dSYM
+run:
+	./$(OUT) $(TARGET) $(RFLAGS)

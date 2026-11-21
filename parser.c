@@ -794,6 +794,26 @@ Node* handleIterateLoop(Parser* p) {
     return iter_stmt;
 }
 
+Node* handleDoLoop(Parser *p) {
+    Node* do_stmt = malloc(sizeof(Node));
+    consume(p, TOKEN_KEYWORD, "do", "expected do statement");
+    do_stmt->do_loop.logic = handleStatement(p);
+    if(IS_KEYWORD(p, "while")) {
+        consume(p, TOKEN_KEYWORD, "while", "expected while statement"); 
+        do_stmt->type = NODE_DO_WHILE_STMT;
+    }
+    else if (IS_KEYWORD(p, "until")){
+        consume(p, TOKEN_KEYWORD, "until", "expected until statement"); 
+        do_stmt->type = NODE_DO_UNTIL_STMT;
+    }
+    else parserError("unrecognized keyword after do statement at position %d", p->pos);
+    consume(p, TOKEN_PUNCTUATION, "(", "Expected ( after do statement keyword");
+    do_stmt->do_loop.expr = parseExpression(p, 0);
+    consume(p, TOKEN_PUNCTUATION, ")", "Expected ) after loop condition");
+    consume(p, TOKEN_PUNCTUATION, ";", "Expected ; to terminate statement!");
+    return do_stmt;
+}
+
 Node* handleWhenStatement(Parser* p) {
     Node* statement = malloc(sizeof(Node));
     if (IS_KEYWORD(p, "when")) {
@@ -898,6 +918,8 @@ Node* handleStatement(Parser* p) {
         return handleForeverStatement(p);
     if (IS_KEYWORD(p, "until") || IS_KEYWORD(p, "while") || IS_KEYWORD(p, "repeat"))
         return handleSingleArgLoop(p);
+    if (IS_KEYWORD(p, "do"))
+        return handleDoLoop(p);
     if (IS_KEYWORD(p, "iterate"))
         return handleIterateLoop(p);
     if (IS_KEYWORD(p, "typedef"))

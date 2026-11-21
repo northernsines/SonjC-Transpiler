@@ -1,4 +1,5 @@
 #include "print.h"
+#include "parser.h"
 #include <inttypes.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -512,6 +513,16 @@ static void printNodeAt(Node* node, const char* prefix, bool isLast, bool isRoot
         case NODE_UNTIL_STMT:
             printf("UntilStmt\n");
             PRINT_CHILDREN(child_prefix, node->single_arg_loop.expr, node->single_arg_loop.logic);
+            break;
+
+        case NODE_DO_WHILE_STMT:
+            printf("DoWhileStmt\n");
+            PRINT_CHILDREN(child_prefix, node->do_loop.logic, node->do_loop.expr);
+            break;
+
+        case NODE_DO_UNTIL_STMT:
+            printf("DoUntilStmt\n");
+            PRINT_CHILDREN(child_prefix, node->do_loop.logic, node->do_loop.expr);
             break;
 
         case NODE_ITERATE_STMT:

@@ -358,7 +358,7 @@ static void printNodeAt(Node *node, const char *prefix, bool isLast, bool isRoot
             break;
 
         case NODE_VAR:
-            printf("Var: %s\n", node->var.name);
+            printf("Id: %s\n", node->var.name);
             break;
 
         case NODE_VAR_DECL:
@@ -430,6 +430,11 @@ static void printNodeAt(Node *node, const char *prefix, bool isLast, bool isRoot
             PRINT_CHILDREN(childPrefix, node->ifStmt.expr, node->ifStmt.logic, node->ifStmt.elseStmt);
             break;
 
+        case NODE_WHEN_STMT:
+            printf("WhenStmt\n");
+            PRINT_CHILDREN(childPrefix, node->whenStmt.expr, node->whenStmt.logic, node->whenStmt.elseStmt);
+            break;
+
         case NODE_ELSE_STMT:
             printf("ElseStmt\n");
             PRINT_CHILDREN(childPrefix, node->elseStmt.logic);
@@ -453,6 +458,11 @@ static void printNodeAt(Node *node, const char *prefix, bool isLast, bool isRoot
         case NODE_UNTIL_STMT:
             printf("UntilStmt\n");
             PRINT_CHILDREN(childPrefix, node->singleArgLoop.expr, node->singleArgLoop.logic);
+            break;
+
+        case NODE_ITERATE_STMT:
+            printf("IterateStmt\n");
+            PRINT_CHILDREN(childPrefix, node->iterateLoop.source, node->iterateLoop.item, node->iterateLoop.logic);
             break;
 
         case NODE_BLOCK:

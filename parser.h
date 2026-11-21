@@ -218,6 +218,12 @@ typedef struct Node{
             struct Node *elseStmt;
         } ifStmt;
 
+        struct { //when statement
+            struct Node *expr;
+            struct Node *logic;
+            struct Node *elseStmt;
+        } whenStmt;
+
         struct { // else statement
             struct Node *logic;
         } elseStmt;

@@ -787,16 +787,69 @@ Node *handleForeverStatement(Parser *p)
     return foreverStmt;
 }
 
-Node *handleSingleArgLoop(Parser *p) {
+Node *handleSingleArgLoop(Parser *p) 
+{
     Node* loopStmt = malloc(sizeof(Node));
     if (IS_KEYWORD(p, "while"))          {loopStmt->type = NODE_WHILE_STMT;  consume(p, TOKEN_KEYWORD, "while", "expected while statement");}
     else if (IS_KEYWORD(p, "until"))     {loopStmt->type = NODE_UNTIL_STMT;  consume(p, TOKEN_KEYWORD, "until", "expected until statement");}
     else if (IS_KEYWORD(p, "repeat"))    {loopStmt->type = NODE_REPEAT_STMT; consume(p, TOKEN_KEYWORD, "repeat", "expected repeat statement");}
-    consume(p, TOKEN_PUNCTUATION, "(", "Expected ( after loop");
+    consume(p, TOKEN_PUNCTUATION, "(", "Expected ( after loop keyword");
     loopStmt->singleArgLoop.expr = parseExpression(p, 0);
     consume(p, TOKEN_PUNCTUATION, ")", "Expected ) after loop condition");
     loopStmt->singleArgLoop.logic = handleStatement(p);
     return loopStmt;
+}
+
+Node *handleIterateLoop(Parser *p)
+{
+    Node* iterStmt = malloc(sizeof(Node));
+    iterStmt->type = NODE_ITERATE_STMT;
+    consume(p, TOKEN_KEYWORD, "iterate", "expected iterate statement");
+    consume(p, TOKEN_PUNCTUATION, "(", "Expected ( after iterate");
+    iterStmt->iterateLoop.source = parseExpression(p, 0);
+    consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after source expression");
+    iterStmt->iterateLoop.item = handleVarDecl(p);
+    consume(p, TOKEN_PUNCTUATION, ")", "Expected ) after loop condition");
+    iterStmt->iterateLoop.logic = handleStatement(p);
+    return iterStmt;
+
+}
+
+Node *handleWhenStatement(Parser *p)
+{
+    Node* statement = malloc(sizeof(Node));
+    if (IS_KEYWORD(p, "when"))
+    {
+        statement->type = NODE_WHEN_STMT;
+        consume(p, TOKEN_KEYWORD, "when", "expected when statement");
+        consume(p, TOKEN_PUNCTUATION, "(", "Expected ( after when"); //consume paren so ) fallthrough means it will stop on final ), leaving it as cur
+        statement->whenStmt.expr = parseExpression(p, 0);
+        consume(p, TOKEN_PUNCTUATION, ")", "Expected ) after if condition");
+        statement->whenStmt.logic = handleStatement(p);
+        if(IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif")) statement->whenStmt.elseStmt = handleWhenStatement(p);
+        else statement->whenStmt.elseStmt = NULL;
+    }
+    else if (IS_KEYWORD(p, "else"))
+    {
+        statement->type = NODE_ELSE_STMT;
+        consume(p, TOKEN_KEYWORD, "else", "expected else statement");
+        statement->elseStmt.logic = handleStatement(p);
+    }
+    else if (IS_KEYWORD(p, "elif"))
+    {
+        statement->type = NODE_ELSE_STMT;
+        consume(p, TOKEN_KEYWORD, "elif", "expected elif statement");
+        Node* elifStmt = malloc(sizeof(Node)); 
+        elifStmt->type = NODE_WHEN_STMT; 
+        statement->elseStmt.logic = elifStmt; //wrap when statement in else statement
+        consume(p, TOKEN_PUNCTUATION, "(", "Expected ( after elif");
+        elifStmt->whenStmt.expr = parseExpression(p, 0);
+        consume(p, TOKEN_PUNCTUATION, ")", "Expected ) after elif condition");
+        elifStmt->whenStmt.logic = handleStatement(p);
+        if(IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif")) elifStmt->whenStmt.elseStmt = handleWhenStatement(p);
+        else elifStmt->whenStmt.elseStmt = NULL;
+    }
+    return statement;
 }
 
 Node *handleIfStatement(Parser *p)
@@ -860,10 +913,12 @@ Node *handleStatement(Parser *p) //starts on whatever is after ; or }
     //logic for determining kind of statement will go here
     //STUB, not all statements implemented.
     if (IS_OPEN_BRACE(p)) return handleCodeBlock(p);
+    if (IS_KEYWORD(p, "when")) return handleWhenStatement(p);
     if (IS_KEYWORD(p, "if")) return handleIfStatement(p);
     if (IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif")) parserError("Expected opening if statement to else or elif at position %d", p->pos);
     if (IS_KEYWORD(p, "forever")) return handleForeverStatement(p);
     if (IS_KEYWORD(p, "until") || IS_KEYWORD(p, "while") || IS_KEYWORD(p, "repeat")) return handleSingleArgLoop(p);
+    if (IS_KEYWORD(p, "iterate")) return handleIterateLoop(p);
     if (IS_KEYWORD(p, "typedef")) return handleTypedef(p);
     if (IS_KEYWORD(p, "object"))
     {

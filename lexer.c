@@ -90,6 +90,7 @@ bool isKeyword(char *text) //STUB add all keywords
         !strcmp(text, "elif") ||
         !strcmp(text, "fixed") ||
         !strcmp(text, "iterate") ||
+        !strcmp(text, "when") ||
         !strcmp(text, "repeat") ||
         !strcmp(text, "until") ||
         !strcmp(text, "forever") ||

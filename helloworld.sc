@@ -1,5 +1,5 @@
 import io;
 
 main() {
-    print("hello world!");
+    io.print("hello world!");
 }

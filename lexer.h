@@ -24,22 +24,22 @@ typedef enum {
 
 typedef struct {
     TokenType type;
-    char *text;
+    char* text;
     int length;
 } Token;
 
 typedef struct {
-    char *source;
+    char* source;
     int pos;
     int line;
     int col;
 
-    bool stringMode;
-    bool charMode;
-    bool charFilled;
-    char currentText[300];
+    bool string_mode;
+    bool char_mode;
+    bool char_filled;
+    char current_text[300];
 } Lexer;
 
-Token nextToken(Lexer *lexer); 
+Token nextToken(Lexer* lexer);
 
 #endif

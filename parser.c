@@ -9,105 +9,112 @@ Parses tokens emitted by the lexer into an Abstract Syntax Tree.
 */
 
 Node rules[60];
-Node *parseExpression(Parser*, int);
-Node *handleStatement(Parser*);
-Node *handleCodeBlock(Parser*);
-Node *parseType(Parser*);
-Node *handleTypedef(Parser*);
-Node *handleGlobal(Parser*);
-Node *handleObjectDecl(Parser*, bool);
-Node *handleFunction(Parser*, Node*);
-Node *handleVarDeclWithType(Parser*, Node*);
+Node* parseExpression(Parser*, int);
+Node* handleStatement(Parser*);
+Node* handleCodeBlock(Parser*);
+Node* parseType(Parser*);
+Node* handleTypedef(Parser*);
+Node* handleGlobal(Parser*);
+Node* handleObjectDecl(Parser*, bool);
+Node* handleFunction(Parser*, Node*);
+Node* handleVarDeclWithType(Parser*, Node*);
 
-Node *handleLiteral(Parser *p) //create literal node, Q16.16 encoding algorithm
-{
+//create literal node, Q16.16 encoding algorithm
+Node* handleLiteral(Parser* p) {
     Token t = CUR(p);
-    Node *literal = malloc(sizeof(Node));
-    switch(t.type) //map tokentype to node types for literals
+    Node* literal = malloc(sizeof(Node));
+    switch (t.type) //map tokentype to node types for literals
     {
-        case TOKEN_INTEGER: literal->type = NODE_INT_LITERAL;    break;
-        case TOKEN_FLOAT:   literal->type = NODE_FLOAT_LITERAL;  break;
-        case TOKEN_FIXED:   literal->type = NODE_FIXED_LITERAL;  break;
-        case TOKEN_CHAR:    literal->type = NODE_CHAR_LITERAL;   break;
-        case TOKEN_STRING:  literal->type = NODE_STRING_LITERAL; break;
-        case TOKEN_KEYWORD: literal->type = NODE_BOOL_LITERAL;   break;
-        default: parserError("Expected literal in literal slot at position %d", p->pos);
+        case TOKEN_INTEGER:
+            literal->type = NODE_INT_LITERAL;
+            break;
+        case TOKEN_FLOAT:
+            literal->type = NODE_FLOAT_LITERAL;
+            break;
+        case TOKEN_FIXED:
+            literal->type = NODE_FIXED_LITERAL;
+            break;
+        case TOKEN_CHAR:
+            literal->type = NODE_CHAR_LITERAL;
+            break;
+        case TOKEN_STRING:
+            literal->type = NODE_STRING_LITERAL;
+            break;
+        case TOKEN_KEYWORD:
+            literal->type = NODE_BOOL_LITERAL;
+            break;
+        default:
+            parserError("Expected literal in literal slot at position %d", p->pos);
     }
     char* str = malloc(strlen(t.text) + 1);
-    if (str == NULL) parserError("malloc for string literal allocation returned null");
+    if (str == NULL)
+        parserError("malloc for string literal allocation returned null");
     strcpy(str, t.text);
-    int strSize = strlen(str);
-    if(literal->type == NODE_INT_LITERAL) //convert values to proper types
+    int str_size = strlen(str);
+    if (literal->type == NODE_INT_LITERAL) //convert values to proper types
     {
-        literal->intLiteral.value = atoi(str);
-    }
-    else if(literal->type == NODE_FLOAT_LITERAL)
+        literal->int_literal.value = atoi(str);
+    } else if (literal->type == NODE_FLOAT_LITERAL) {
+        literal->float_literal.value = atof(str);
+    } else if (literal->type == NODE_FIXED_LITERAL) // Q16.16 fixed point algorithm
     {
-        literal->floatLiteral.value = atof(str);
-    }
-    else if(literal->type == NODE_FIXED_LITERAL) // Q16.16 fixed point algorithm
-    {
-        if (strSize > 0 && str[strSize - 1] == 'f') //drop the fixed marker before splitting the number
+        if (str_size > 0 && str[str_size - 1] == 'f') //drop the fixed marker before splitting the number
         {
-            str[--strSize] = '\0';
+            str[--str_size] = '\0';
         }
 
         int i;
-        char *intPartStr = malloc(strlen(str) + 1);
-        char *fracPartStr = malloc(strlen(str) + 1);
-        for(i = 0; i < strSize; i++) //iterate until detect . build left string
+        char* int_part_str = malloc(strlen(str) + 1);
+        char* frac_part_str = malloc(strlen(str) + 1);
+        for (i = 0; i < str_size; i++) //iterate until detect . build left string
         {
             char ch = str[i];
-            bool isDot = ch == '.';
-            if(isDot) break;
-            else
-            {
-                intPartStr[i] = ch;
+            bool is_dot = ch == '.';
+            if (is_dot)
+                break;
+            else {
+                int_part_str[i] = ch;
             }
         }
-        intPartStr[i] = '\0';
+        int_part_str[i] = '\0';
         i++; //skip dot
         int ioffset = i;
-        for(i = ioffset; i < strSize; i++) //iterate until null term, build right string
+        for (i = ioffset; i < str_size; i++) //iterate until null term, build right string
         {
             char ch = str[i];
-            bool isNull = ch == '\0';
-            if(isNull) break;
-            else
-            {
-                fracPartStr[i-ioffset] = ch;
+            bool is_null = ch == '\0';
+            if (is_null)
+                break;
+            else {
+                frac_part_str[i - ioffset] = ch;
             }
         }
-        fracPartStr[i-ioffset] = '\0';
-        uint64_t intPart = strtoull(intPartStr, NULL, 10); 
-        uint64_t fracDigits = strtoull(fracPartStr, NULL, 10);
-        size_t fracLen = strlen(fracPartStr);
+        frac_part_str[i - ioffset] = '\0';
+        uint64_t int_part = strtoull(int_part_str, NULL, 10);
+        uint64_t frac_digits = strtoull(frac_part_str, NULL, 10);
+        size_t frac_len = strlen(frac_part_str);
 
-        __uint128_t scaled = (__uint128_t)fracDigits << 16; 
-        uint32_t fracPart = (uint32_t)(scaled / pow10(fracLen)); // pow10 = your own int pow
+        __uint128_t scaled = (__uint128_t)frac_digits << 16;
+        uint32_t frac_part = (uint32_t)(scaled / pow10(frac_len)); // pow10 = your own int pow
 
-        uint32_t underlying = ((uint32_t)intPart << 16) | fracPart; 
-        literal->fixedLiteral.value = underlying;
-    }
-    else if(literal->type == NODE_CHAR_LITERAL)
-    {
-        literal->charLiteral.value = *str;
-    }
-    else if(literal->type == NODE_STRING_LITERAL)
-    {
-       literal->stringLiteral.value = str;
-    }
-    else if(literal->type == NODE_BOOL_LITERAL)
-    {
-        if(!strcmp(str, "true")) literal->boolLiteral.value = true;
-        else literal->boolLiteral.value = false;
+        uint32_t underlying = ((uint32_t)int_part << 16) | frac_part;
+        literal->fixed_literal.value = underlying;
+    } else if (literal->type == NODE_CHAR_LITERAL) {
+        literal->char_literal.value = *str;
+    } else if (literal->type == NODE_STRING_LITERAL) {
+        literal->string_literal.value = str;
+    } else if (literal->type == NODE_BOOL_LITERAL) {
+        if (!strcmp(str, "true"))
+            literal->bool_literal.value = true;
+        else
+            literal->bool_literal.value = false;
     }
     skip(p, "advancing past literal");
     return literal;
 }
 
-static bool isTypeQualifierStart(Parser *p) //check if simple tag qualifier
-{
+//check if simple tag qualifier
+static bool isTypeQualifierStart(Parser* p) {
     return IS_OPEN_PAREN(p) || IS_OPEN_BRACKET(p) ||
            IS_OP(p, "*") ||
            IS_KEYWORD(p, "const") || IS_KEYWORD(p, "volatile") ||
@@ -115,89 +122,81 @@ static bool isTypeQualifierStart(Parser *p) //check if simple tag qualifier
            IS_KEYWORD(p, "long") || IS_KEYWORD(p, "short");
 }
 
-static Node *makeSimpleQualifier(SimpleQualifier simpleQual, QualifierKind kind) //simple tag qualifier that doesn't contain further data
-{
-    Node *qualifier = malloc(sizeof(Node));
+//simple tag qualifier that doesn't contain further data
+static Node* makeSimpleQualifier(SimpleQualifier simple_qual, QualifierKind kind) {
+    Node* qualifier = malloc(sizeof(Node));
     qualifier->type = NODE_TYPE_QUALIFIER;
-    qualifier->typeQualifier.kind = kind;
-    qualifier->typeQualifier.simpleQual = simpleQual;
+    qualifier->type_qualifier.kind = kind;
+    qualifier->type_qualifier.simple_qual = simple_qual;
     return qualifier;
 }
 
-static Node *makePrimitiveType(PrimitiveType primitive) //bare primitive type node
-{
-    Node *type = malloc(sizeof(Node));
+//bare primitive type node
+static Node* makePrimitiveType(PrimitiveType primitive) {
+    Node* type = malloc(sizeof(Node));
     type->type = NODE_PRIMITIVE;
-    type->primitiveType.type = primitive;
+    type->primitive_type.type = primitive;
     return type;
 }
 
-static void registerDefType(Parser *p, char *name) //track user-defined type names for isTypeName
-{
-    p->defTypes = realloc(p->defTypes, sizeof(char*) * (p->defTypeCount + 1));
-    p->defTypes[p->defTypeCount++] = name;
+//track user-defined type names for isTypeName
+static void registerDefType(Parser* p, char* name) {
+    p->def_types = realloc(p->def_types, sizeof(char*) * (p->def_type_count + 1));
+    p->def_types[p->def_type_count++] = name;
 }
 
-static Node *innermostType(Node *type) //skip qualifiers that still describe the base type
-{
-    while (type && type->type == NODE_TYPE)
-    {
-        QualifierKind kind = type->typeNode.qualifier->typeQualifier.kind;
-        if (kind == QUAL_POINTER || kind == QUAL_ARRAY || kind == QUAL_FUNCTION) break;
-        type = type->typeNode.innerType;
+//skip qualifiers that still describe the base type
+static Node* innermostType(Node* type) {
+    while (type && type->type == NODE_TYPE) {
+        QualifierKind kind = type->type_node.qualifier->type_qualifier.kind;
+        if (kind == QUAL_POINTER || kind == QUAL_ARRAY || kind == QUAL_FUNCTION)
+            break;
+        type = type->type_node.inner_type;
     }
     return type;
 }
 
-static Node *handleArrayQualifier(Parser *p) //qualifier for stack array
-{
-    Node *qualifier = malloc(sizeof(Node));
+//qualifier for stack array
+static Node* handleArrayQualifier(Parser* p) {
+    Node* qualifier = malloc(sizeof(Node));
     qualifier->type = NODE_TYPE_QUALIFIER;
-    qualifier->typeQualifier.kind = QUAL_ARRAY;
+    qualifier->type_qualifier.kind = QUAL_ARRAY;
 
     consume(p, TOKEN_PUNCTUATION, "[", "Expected [ to begin array type");
-    Token sizeTok = consume(p, TOKEN_INTEGER, NULL, "Expected integer array size");
-    qualifier->typeQualifier.arraySize = atoi(sizeTok.text);
+    Token size_tok = consume(p, TOKEN_INTEGER, NULL, "Expected integer array size");
+    qualifier->type_qualifier.array_size = atoi(size_tok.text);
     consume(p, TOKEN_PUNCTUATION, "]", "Expected ] after array size");
 
     return qualifier;
 }
 
-static Node *handleFuncQualifier(Parser *p) //type qualifier for function pointer
-{
-    Node *qualifier = malloc(sizeof(Node));
+//type qualifier for function pointer
+static Node* handleFuncQualifier(Parser* p) {
+    Node* qualifier = malloc(sizeof(Node));
     qualifier->type = NODE_TYPE_QUALIFIER;
-    qualifier->typeQualifier.kind = QUAL_FUNCTION;
+    qualifier->type_qualifier.kind = QUAL_FUNCTION;
 
-    int paramCap = 8;
-    int paramCount = 0;
-    Node **params = malloc(sizeof(Node*) * paramCap);
+    int param_cap = 8;
+    int param_count = 0;
+    Node** params = malloc(sizeof(Node*) * param_cap);
 
     consume(p, TOKEN_PUNCTUATION, "(", "Expected ( to begin function type");
 
-    if (IS_CLOSE_PAREN(p))
-    {
+    if (IS_CLOSE_PAREN(p)) {
         consume(p, TOKEN_PUNCTUATION, ")", "Expected ) to close function type");
-    }
-    else if (IS_VOID_KW(p) && NEXT_PUNCT(p, ")"))
-    {
+    } else if (IS_VOID_KW(p) && NEXT_PUNCT(p, ")")) {
         skip(p, "advancing past void in function type");
         consume(p, TOKEN_PUNCTUATION, ")", "Expected ) to close function type");
-    }
-    else
-    {
-        while (1)
-        {
-            if (paramCount >= paramCap)
-            {
-                paramCap *= 2;
-                params = realloc(params, sizeof(Node*) * paramCap);
+    } else {
+        while (1) {
+            if (param_count >= param_cap) {
+                param_cap *= 2;
+                params = realloc(params, sizeof(Node*) * param_cap);
             }
 
-            params[paramCount++] = parseType(p);
+            params[param_count++] = parseType(p);
 
-            if (IS_COMMA(p))
-            {
+            if (IS_COMMA(p)) {
                 skip(p, "advancing past , in function type");
                 continue;
             }
@@ -207,56 +206,51 @@ static Node *handleFuncQualifier(Parser *p) //type qualifier for function pointe
         consume(p, TOKEN_PUNCTUATION, ")", "Expected ) to close function type");
     }
 
-    qualifier->typeQualifier.funcQual.params = params;
-    qualifier->typeQualifier.funcQual.paramCount = paramCount;
+    qualifier->type_qualifier.func_qual.params = params;
+    qualifier->type_qualifier.func_qual.param_count = param_count;
 
     return qualifier;
 }
 
-static Node *handleTypeQualifier(Parser *p) //starts on qualifier, consumes qualifier to wind up on next token after it
-{
-    if (IS_OPEN_PAREN(p)) return handleFuncQualifier(p);
-    if (IS_OPEN_BRACKET(p)) return handleArrayQualifier(p);
+//starts on qualifier, consumes qualifier to wind up on next token after it
+static Node* handleTypeQualifier(Parser* p) {
+    if (IS_OPEN_PAREN(p))
+        return handleFuncQualifier(p);
+    if (IS_OPEN_BRACKET(p))
+        return handleArrayQualifier(p);
 
-    if (IS_OP(p, "*"))
-    {
-        Node *qualifier = makeSimpleQualifier(SQ_POINTER, QUAL_POINTER);
+    if (IS_OP(p, "*")) {
+        Node* qualifier = makeSimpleQualifier(SQ_POINTER, QUAL_POINTER);
         skip(p, "advancing past * in type");
         return qualifier;
     }
-    if (IS_KEYWORD(p, "const"))
-    {
-        Node *qualifier = makeSimpleQualifier(SQ_CONST, QUAL_CONST);
+    if (IS_KEYWORD(p, "const")) {
+        Node* qualifier = makeSimpleQualifier(SQ_CONST, QUAL_CONST);
         skip(p, "advancing past const in type");
         return qualifier;
     }
-    if (IS_KEYWORD(p, "volatile"))
-    {
-        Node *qualifier = makeSimpleQualifier(SQ_VOLATILE, QUAL_VOLATILE);
+    if (IS_KEYWORD(p, "volatile")) {
+        Node* qualifier = makeSimpleQualifier(SQ_VOLATILE, QUAL_VOLATILE);
         skip(p, "advancing past volatile in type");
         return qualifier;
     }
-    if (IS_KEYWORD(p, "raw"))
-    {
-        Node *qualifier = makeSimpleQualifier(SQ_RAW, QUAL_RAW);
+    if (IS_KEYWORD(p, "raw")) {
+        Node* qualifier = makeSimpleQualifier(SQ_RAW, QUAL_RAW);
         skip(p, "advancing past raw in type");
         return qualifier;
     }
-    if (IS_KEYWORD(p, "unsigned"))
-    {
-        Node *qualifier = makeSimpleQualifier(SQ_UNSIGNED, QUAL_UNSIGNED);
+    if (IS_KEYWORD(p, "unsigned")) {
+        Node* qualifier = makeSimpleQualifier(SQ_UNSIGNED, QUAL_UNSIGNED);
         skip(p, "advancing past unsigned in type");
         return qualifier;
     }
-    if (IS_KEYWORD(p, "long"))
-    {
-        Node *qualifier = makeSimpleQualifier(SQ_LONG, QUAL_LONG);
+    if (IS_KEYWORD(p, "long")) {
+        Node* qualifier = makeSimpleQualifier(SQ_LONG, QUAL_LONG);
         skip(p, "advancing past long in type");
         return qualifier;
     }
-    if (IS_KEYWORD(p, "short"))
-    {
-        Node *qualifier = makeSimpleQualifier(SQ_SHORT, QUAL_SHORT);
+    if (IS_KEYWORD(p, "short")) {
+        Node* qualifier = makeSimpleQualifier(SQ_SHORT, QUAL_SHORT);
         skip(p, "advancing past short in type");
         return qualifier;
     }
@@ -264,220 +258,207 @@ static Node *handleTypeQualifier(Parser *p) //starts on qualifier, consumes qual
     return NULL;
 }
 
-Node *parseType(Parser *p) // type -> [type (qualifier)], can parse itself through wrapping itself up in a loop!
-{
-    Node *currentType;
+// type -> [type (qualifier)], can parse itself through wrapping itself up in a loop!
+Node* parseType(Parser* p) {
+    Node* current_type;
     Token base = CUR(p);
     PrimitiveType primitive;
 
-    if (primitiveFromToken(&base, &primitive))
-    {
-        currentType = makePrimitiveType(primitive);
+    if (primitiveFromToken(&base, &primitive)) {
+        current_type = makePrimitiveType(primitive);
         skip(p, "expected qualifier or name after type");
-    }
-    else if (base.type == TOKEN_IDENTIFIER)
-    {
-        currentType = malloc(sizeof(Node));
-        currentType->type = NODE_TYPEREF;
-        currentType->typeRef.name = base.text;
+    } else if (base.type == TOKEN_IDENTIFIER) {
+        current_type = malloc(sizeof(Node));
+        current_type->type = NODE_TYPEREF;
+        current_type->type_ref.name = base.text;
         skip(p, "expected qualifier or name after type");
-    }
-    else
-    {
+    } else {
         parserError("Expected type name at position %d, got '%s'", p->pos, base.text);
         return NULL;
     }
 
-    bool hasPreviousQualifier = false;
-    QualifierKind previousKind = QUAL_POINTER;
+    bool has_previous_qualifier = false;
+    QualifierKind previous_kind = QUAL_POINTER;
 
-    while (isTypeQualifierStart(p))
-    {
-        if (IS_OPEN_BRACKET(p) && hasPreviousQualifier && previousKind == QUAL_ARRAY)
+    while (isTypeQualifierStart(p)) {
+        if (IS_OPEN_BRACKET(p) && has_previous_qualifier && previous_kind == QUAL_ARRAY)
             parserError("Adjacent array brackets are not allowed; typedef an array first");
 
-        Node *qualifier = handleTypeQualifier(p);
-        QualifierKind kind = qualifier->typeQualifier.kind;
+        Node* qualifier = handleTypeQualifier(p);
+        QualifierKind kind = qualifier->type_qualifier.kind;
 
         if (kind == QUAL_RAW &&
-            !(currentType->type == NODE_TYPE &&
-              currentType->typeNode.qualifier->typeQualifier.kind == QUAL_POINTER))
+            !(current_type->type == NODE_TYPE &&
+              current_type->type_node.qualifier->type_qualifier.kind == QUAL_POINTER))
             parserError("raw must qualify a pointer at position %d", p->pos);
 
-        if (kind == QUAL_UNSIGNED || kind == QUAL_LONG || kind == QUAL_SHORT)
-        {
-            Node *baseType = innermostType(currentType);
-            if (!baseType || baseType->type != NODE_PRIMITIVE)
+        if (kind == QUAL_UNSIGNED || kind == QUAL_LONG || kind == QUAL_SHORT) {
+            Node* base_type = innermostType(current_type);
+            if (!base_type || base_type->type != NODE_PRIMITIVE)
                 parserError("unsigned, long, and short must qualify a base type at position %d", p->pos);
         }
 
-        Node *wrapped = malloc(sizeof(Node));
+        Node* wrapped = malloc(sizeof(Node));
         wrapped->type = NODE_TYPE;
-        wrapped->typeNode.innerType = currentType;
-        wrapped->typeNode.qualifier = qualifier;
+        wrapped->type_node.inner_type = current_type;
+        wrapped->type_node.qualifier = qualifier;
 
-        currentType = wrapped;
-        previousKind = kind;
-        hasPreviousQualifier = true;
+        current_type = wrapped;
+        previous_kind = kind;
+        has_previous_qualifier = true;
     }
 
-    return currentType;
+    return current_type;
 }
 
-Node *handleVarDeclWithType(Parser *p, Node *type) //var declaration with an already parsed type, starts on name
-{
-    Node *varDecl = malloc(sizeof(Node));
-    varDecl->type = NODE_VAR_DECL;
-    varDecl->varDecl.type = type;
+//var declaration with an already parsed type, starts on name
+Node* handleVarDeclWithType(Parser* p, Node* type) {
+    Node* var_decl = malloc(sizeof(Node));
+    var_decl->type = NODE_VAR_DECL;
+    var_decl->var_decl.type = type;
 
-    Node *outerType = varDecl->varDecl.type;
-    if (outerType->type == NODE_TYPE &&
-        outerType->typeNode.qualifier->typeQualifier.kind == QUAL_FUNCTION)
+    Node* outer_type = var_decl->var_decl.type;
+    if (outer_type->type == NODE_TYPE &&
+        outer_type->type_node.qualifier->type_qualifier.kind == QUAL_FUNCTION)
         parserError("A variable cannot have a bare function type; declare a pointer to function instead");
 
-    Token nameTok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected variable name after type");
+    Token name_tok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected variable name after type");
 
-    Node *var = malloc(sizeof(Node));
+    Node* var = malloc(sizeof(Node));
     var->type = NODE_VAR;
-    var->var.name = nameTok.text;
-    varDecl->varDecl.var = var;
+    var->var.name = name_tok.text;
+    var_decl->var_decl.var = var;
 
-    if (IS_OP(p, "="))
-    {
+    if (IS_OP(p, "=")) {
         skip(p, "advancing past = in variable declaration");
-        varDecl->varDecl.valueExpr = parseExpression(p, 10);
-    }
-    else
-    {
-        varDecl->varDecl.valueExpr = NULL;
+        var_decl->var_decl.value_expr = parseExpression(p, 10);
+    } else {
+        var_decl->var_decl.value_expr = NULL;
     }
 
-    return varDecl;
+    return var_decl;
 }
 
-Node *handleVarDecl(Parser *p) //create var declaration in the format varDecl -> [type name (expr)]
-{
+//create var declaration in the format var_decl -> [type name (expr)]
+Node* handleVarDecl(Parser* p) {
     return handleVarDeclWithType(p, parseType(p));
 }
 
-static Node *handleObjectMember(Parser *p) //field or method, starts on member type
-{
-    Node *type = parseType(p);
+//field or method, starts on member type
+static Node* handleObjectMember(Parser* p) {
+    Node* type = parseType(p);
 
     if (IS_IDENTIFIER(p) && NEXT_PUNCT(p, "("))
         return handleFunction(p, type); //p still sits on the method name
 
-    Node *field = handleVarDeclWithType(p, type);
+    Node* field = handleVarDeclWithType(p, type);
     consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after field declaration");
     return field;
 }
 
-Node *handleObjectDecl(Parser *p, bool requireName) //object type/template, leaves pos after closing }
-{
-    Node *object = malloc(sizeof(Node));
+//object type/template, leaves pos after closing }
+Node* handleObjectDecl(Parser* p, bool requireName) {
+    Node* object = malloc(sizeof(Node));
     object->type = NODE_OBJECT_DECL;
-    object->objectDecl.name = NULL;
+    object->object_decl.name = NULL;
 
     consume(p, TOKEN_KEYWORD, "object", "Expected object");
 
-    if (IS_IDENTIFIER(p))
-    {
-        Token nameTok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected object name");
-        object->objectDecl.name = nameTok.text;
-        registerDefType(p, nameTok.text); //register before the body so members can self-reference
-    }
-    else if (requireName)
-    {
+    if (IS_IDENTIFIER(p)) {
+        Token name_tok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected object name");
+        object->object_decl.name = name_tok.text;
+        registerDefType(p, name_tok.text); //register before the body so members can self-reference
+    } else if (requireName) {
         parserError("Expected object name at position %d", p->pos);
     }
 
     consume(p, TOKEN_PUNCTUATION, "{", "Expected { to begin object body");
 
-    int memberCap = 8;
-    Node **members = malloc(sizeof(Node*) * memberCap);
-    int memberCount = 0;
+    int member_cap = 8;
+    Node** members = malloc(sizeof(Node*) * member_cap);
+    int member_count = 0;
 
-    while (!IS_CLOSE_BRACE(p))
-    {
-        if (p->pos >= p->tokenCount || CUR(p).type == TOKEN_EOF)
+    while (!IS_CLOSE_BRACE(p)) {
+        if (p->pos >= p->token_count || CUR(p).type == TOKEN_EOF)
             parserError("Expected } before end of file in object body");
 
-        if (memberCount >= memberCap)
-        {
-            memberCap *= 2;
-            members = realloc(members, sizeof(Node*) * memberCap);
+        if (member_count >= member_cap) {
+            member_cap *= 2;
+            members = realloc(members, sizeof(Node*) * member_cap);
         }
-        members[memberCount++] = handleObjectMember(p);
+        members[member_count++] = handleObjectMember(p);
     }
 
     consume(p, TOKEN_PUNCTUATION, "}", "Expected } to close object body");
 
-    object->objectDecl.members = members;
-    object->objectDecl.memberCount = memberCount;
+    object->object_decl.members = members;
+    object->object_decl.member_count = member_count;
     return object;
 }
 
-Node *handleTypedef(Parser *p) //type aliasing statement
-{
-    Node *typeDecl = malloc(sizeof(Node));
-    typeDecl->type = NODE_TYPE_DECL;
+//type aliasing statement
+Node* handleTypedef(Parser* p) {
+    Node* type_decl = malloc(sizeof(Node));
+    type_decl->type = NODE_TYPE_DECL;
 
     consume(p, TOKEN_KEYWORD, "typedef", "Expected typedef");
 
     if (IS_KEYWORD(p, "object")) //object templates can be anonymous or named inside the typedef
     {
-        typeDecl->typeDecl.underlyingInstance = handleObjectDecl(p, false);
+        type_decl->type_decl.underlying_instance = handleObjectDecl(p, false);
 
-        Token aliasTok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected typedef alias name");
+        Token alias_tok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected typedef alias name");
         consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after typedef");
-        typeDecl->typeDecl.aliasName = aliasTok.text;
-        registerDefType(p, aliasTok.text);
+        type_decl->type_decl.alias_name = alias_tok.text;
+        registerDefType(p, alias_tok.text);
 
-        return typeDecl;
+        return type_decl;
     }
 
-    typeDecl->typeDecl.underlyingInstance = parseType(p);
+    type_decl->type_decl.underlying_instance = parseType(p);
 
-    Token aliasTok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected typedef alias name");
+    Token alias_tok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected typedef alias name");
     consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after typedef");
-    typeDecl->typeDecl.aliasName = aliasTok.text;
+    type_decl->type_decl.alias_name = alias_tok.text;
 
-    registerDefType(p, aliasTok.text);
+    registerDefType(p, alias_tok.text);
 
-    return typeDecl;
+    return type_decl;
 }
 
-Node *handleParam(Parser *p, bool declaration) //redirect to proper function
-{
-    if (declaration) return handleVarDecl(p);
-    if (IS_LITERAL(p)) return handleLiteral(p);
+//redirect to proper function
+Node* handleParam(Parser* p, bool declaration) {
+    if (declaration)
+        return handleVarDecl(p);
+    if (IS_LITERAL(p))
+        return handleLiteral(p);
     return parseExpression(p, 0);
 }
 
-Node **handleArgList(Parser *p, bool declaration, int *outCount) //starts on function name
-{
-    int paramCap = 8;
-    Node **params = malloc(sizeof(Node*) * paramCap);
-    int paramCount = 0;
+//starts on function name
+Node** handleArgList(Parser* p, bool declaration, int* outCount) {
+    int param_cap = 8;
+    Node** params = malloc(sizeof(Node*) * param_cap);
+    int param_count = 0;
 
     skip(p, "Expected ( after name to begin argument list"); // step off name, onto (
     consume(p, TOKEN_PUNCTUATION, "(", "Expected ( to begin argument list");
 
-    if (IS_VOID_KW(p) && NEXT_PUNCT(p, ")"))
-    {
+    if (IS_VOID_KW(p) && NEXT_PUNCT(p, ")")) {
         skip(p, "advancing past void in parameter list");
     }
 
-    while (!IS_CLOSE_PAREN(p))
-    {
-        if (p->pos >= p->tokenCount || CUR(p).type == TOKEN_EOF)
+    while (!IS_CLOSE_PAREN(p)) {
+        if (p->pos >= p->token_count || CUR(p).type == TOKEN_EOF)
             parserError("Expected ) before end of file in parameter list");
 
-        if (paramCount >= paramCap) { paramCap *= 2; params = realloc(params, sizeof(Node*) * paramCap); }
-        params[paramCount++] = handleParam(p, declaration);
+        if (param_count >= param_cap) {
+            param_cap *= 2;
+            params = realloc(params, sizeof(Node*) * param_cap);
+        }
+        params[param_count++] = handleParam(p, declaration);
 
-        if (IS_COMMA(p))
-        {
+        if (IS_COMMA(p)) {
             skip(p, "advancing past , in parameter list");
             continue;
         }
@@ -486,148 +467,144 @@ Node **handleArgList(Parser *p, bool declaration, int *outCount) //starts on fun
     }
 
     consume(p, TOKEN_PUNCTUATION, ")", "Expected ) to close parameter list");
-    *outCount = paramCount;
+    *outCount = param_count;
     return params;
 }
 
-Node **handleCallArgs(Parser *p, int *outCount) //starts after opening (, consumes closing )
-{
-    int argCap = 8;
-    Node **args = malloc(sizeof(Node*) * argCap);
-    int argCount = 0;
+//starts after opening (, consumes closing )
+Node** handleCallArgs(Parser* p, int* outCount) {
+    int arg_cap = 8;
+    Node** args = malloc(sizeof(Node*) * arg_cap);
+    int arg_count = 0;
 
-    if (!IS_CLOSE_PAREN(p))
-    {
-        while (1)
-        {
-            if (argCount >= argCap) { argCap *= 2; args = realloc(args, sizeof(Node*) * argCap); }
-            args[argCount] = parseExpression(p, 10); //rbp 10 stops before comma
-            argCount++;
-            if (!IS_COMMA(p)) break;
+    if (!IS_CLOSE_PAREN(p)) {
+        while (1) {
+            if (arg_count >= arg_cap) {
+                arg_cap *= 2;
+                args = realloc(args, sizeof(Node*) * arg_cap);
+            }
+            args[arg_count] = parseExpression(p, 10); //rbp 10 stops before comma
+            arg_count++;
+            if (!IS_COMMA(p))
+                break;
             skip(p, "Expected another argument after , before end of file");
         }
     }
     consume(p, TOKEN_PUNCTUATION, ")", "Expected ) to close call expression");
-    *outCount = argCount;
+    *outCount = arg_count;
     return args;
 }
 
-Node* ledCall(Parser *p, Node *left) //build call expression, ( was already skipped
-{
-    Node *exp = malloc(sizeof(Node));
+//build call expression, ( was already skipped
+Node* ledCall(Parser* p, Node* left) {
+    Node* exp = malloc(sizeof(Node));
 
     exp->type = NODE_CALL_EXPR;
-    exp->callExpr.callee = left;
-    exp->callExpr.args = handleCallArgs(p, &exp->callExpr.argCount);
+    exp->call_expr.callee = left;
+    exp->call_expr.args = handleCallArgs(p, &exp->call_expr.arg_count);
     return exp;
 }
 
-Node* nudCast(Parser *p) //build cast expression
-{
-    Node *castExp = malloc(sizeof(Node));
+//build cast expression
+Node* nudCast(Parser* p) {
+    Node* cast_exp = malloc(sizeof(Node));
 
-    castExp->type = NODE_CAST;
-    castExp->cast.type = parseType(p);
+    cast_exp->type = NODE_CAST;
+    cast_exp->cast.type = parseType(p);
     consume(p, TOKEN_PUNCTUATION, ")", "expected closing paren on cast");
-    castExp->cast.exp = parseExpression(p, 139);
-    return castExp;
+    cast_exp->cast.exp = parseExpression(p, 139);
+    return cast_exp;
 }
 
-Node* nudParen(Parser *p) //distinguish cast from parenthesized expression
-{
-    if (isTypeName(p, &CUR(p))) return nudCast(p); //( was already skipped
+//distinguish cast from parenthesized expression
+Node* nudParen(Parser* p) {
+    if (isTypeName(p, &CUR(p)))
+        return nudCast(p); //( was already skipped
 
-    Node *exp = parseExpression(p, 0);
+    Node* exp = parseExpression(p, 0);
     consume(p, TOKEN_PUNCTUATION, ")", "Expected ) to close parenthesized expression");
     return exp;
 }
 
-Node* nudUnary(Parser *p) //build unary expression with prefix operator
-{
-    Node *exp = malloc(sizeof(Node));
+//build unary expression with prefix operator
+Node* nudUnary(Parser* p) {
+    Node* exp = malloc(sizeof(Node));
 
-    Token opToken = PREV(p); //prefix token was already skipped by parseExpression
-    OperatorType opType = lookupOperator(opToken); //get operator type of current operator
-    Node *op = malloc(sizeof(Node));
+    Token op_token = PREV(p);                       //prefix token was already skipped by parseExpression
+    OperatorType op_type = lookupOperator(op_token); //get operator type of current operator
+    Node* op = malloc(sizeof(Node));
 
     op->type = NODE_OPERATOR;
-    op->operator.opType = opType;
-    int rbp = rules[opType].operator.lbp - 1; //prefix unary is always right assoc
+    op->operator.op_type = op_type;
+    int rbp = rules[op_type].operator.lbp - 1; //prefix unary is always right assoc
 
     exp->type = NODE_UNARY_EXPR;
-    exp->unaryExpr.operator = op;
-    exp->unaryExpr.exp = parseExpression(p, rbp);
+    exp->unary_expr.operator = op;
+    exp->unary_expr.exp = parseExpression(p, rbp);
 
     return exp;
 }
 
-Node* nudSizeof(Parser *p) //build sizeof expression, operand may be (type) or an expression
-{
-    Node *exp = malloc(sizeof(Node));
-    Node *op = malloc(sizeof(Node));
+//build sizeof expression, operand may be (type) or an expression
+Node* nudSizeof(Parser* p) {
+    Node* exp = malloc(sizeof(Node));
+    Node* op = malloc(sizeof(Node));
 
     op->type = NODE_OPERATOR;
-    op->operator.opType = OPERATOR_SIZEOF;
+    op->operator.op_type = OPERATOR_SIZEOF;
 
     exp->type = NODE_UNARY_EXPR;
-    exp->unaryExpr.operator = op;
+    exp->unary_expr.operator = op;
 
-    if (IS_OPEN_PAREN(p))
-    {
-        int openPos = p->pos;
+    if (IS_OPEN_PAREN(p)) {
+        int open_pos = p->pos;
         skip(p, "advancing past ( in sizeof");
 
-        if (isTypeName(p, &CUR(p)))
-        {
-            Node *type = parseType(p);
-            if (IS_CLOSE_PAREN(p))
-            {
+        if (isTypeName(p, &CUR(p))) {
+            Node* type = parseType(p);
+            if (IS_CLOSE_PAREN(p)) {
                 skip(p, "advancing past ) in sizeof");
-                exp->unaryExpr.exp = type;
+                exp->unary_expr.exp = type;
                 return exp;
             }
-            p->pos = openPos; //not a type operand, reparse as an expression
+            p->pos = open_pos; //not a type operand, reparse as an expression
         }
 
-        exp->unaryExpr.exp = parseExpression(p, 0);
+        exp->unary_expr.exp = parseExpression(p, 0);
         consume(p, TOKEN_PUNCTUATION, ")", "Expected ) to close sizeof expression");
-    }
-    else
-    {
-        exp->unaryExpr.exp = parseExpression(p, 139);
+    } else {
+        exp->unary_expr.exp = parseExpression(p, 139);
     }
 
     return exp;
 }
 
-Node* nudAddress(Parser *p) //build address-of expression with prefix &
-{
-    Node *exp = malloc(sizeof(Node));
+//build address-of expression with prefix &
+Node* nudAddress(Parser* p) {
+    Node* exp = malloc(sizeof(Node));
 
-    Token opToken = PREV(p); //prefix token was already skipped by parseExpression
-    OperatorType opType = lookupOperator(opToken);
-    Node *op = malloc(sizeof(Node));
+    Token op_token = PREV(p); //prefix token was already skipped by parseExpression
+    OperatorType op_type = lookupOperator(op_token);
+    Node* op = malloc(sizeof(Node));
 
     op->type = NODE_OPERATOR;
-    op->operator.opType = opType;
+    op->operator.op_type = op_type;
 
     exp->type = NODE_UNARY_EXPR;
-    exp->unaryExpr.operator = op;
-    exp->unaryExpr.exp = parseExpression(p, 139); //bind like a unary, not bitwise AND
+    exp->unary_expr.operator = op;
+    exp->unary_expr.exp = parseExpression(p, 139); //bind like a unary, not bitwise AND
 
     return exp;
 }
 
-Node* nudPrimary(Parser *p) //build literal or var node from current token
-{
+//build literal or var node from current token
+Node* nudPrimary(Parser* p) {
     Token tok = CUR(p);
 
-    Node *node = malloc(sizeof(Node));
-    if (IS_LITERAL(p))
-    {
+    Node* node = malloc(sizeof(Node));
+    if (IS_LITERAL(p)) {
         node = handleLiteral(p);
-    }
-    else // variable
+    } else // variable
     {
         node->type = NODE_VAR;
         node->var.name = tok.text;
@@ -636,452 +613,459 @@ Node* nudPrimary(Parser *p) //build literal or var node from current token
     return node;
 }
 
-Node* ledUnary(Parser *p, Node *left) //build unary expression with postfix operator
-{
-    Node *exp = malloc(sizeof(Node));
+//build unary expression with postfix operator
+Node* ledUnary(Parser* p, Node* left) {
+    Node* exp = malloc(sizeof(Node));
 
-    Token opToken = PREV(p); //postfix token was already skipped by parseExpression
-    OperatorType opType = lookupOperator(opToken);
-    Node *op = malloc(sizeof(Node));
+    Token op_token = PREV(p); //postfix token was already skipped by parseExpression
+    OperatorType op_type = lookupOperator(op_token);
+    Node* op = malloc(sizeof(Node));
 
     op->type = NODE_OPERATOR;
-    op->operator.opType = opType;
+    op->operator.op_type = op_type;
 
     exp->type = NODE_UNARY_EXPR;
-    exp->unaryExpr.operator = op;
-    exp->unaryExpr.exp = left;
+    exp->unary_expr.operator = op;
+    exp->unary_expr.exp = left;
 
     return exp;
 }
 
-Node* ledBinaryLeft(Parser *p, Node *left) //build new left, starts on right of op, creates binary expression with left, operator, right
-{
-    Node *exp = malloc(sizeof(Node)); //allocate expression node
+//build new left, starts on right of op, creates binary expression with left, operator, right
+Node* ledBinaryLeft(Parser* p, Node* left) {
+    Node* exp = malloc(sizeof(Node)); //allocate expression node
 
-    Token opToken = PREV(p); //operator token is token just skipped
-    OperatorType opType = lookupOperator(opToken); //get operator type of current operator
-    Node *op = malloc(sizeof(Node));
+    Token op_token = PREV(p);                       //operator token is token just skipped
+    OperatorType op_type = lookupOperator(op_token); //get operator type of current operator
+    Node* op = malloc(sizeof(Node));
 
     op->type = NODE_OPERATOR;
-    op->operator.opType = opType;
-    int rbp = rules[opType].operator.lbp; 
+    op->operator.op_type = op_type;
+    int rbp = rules[op_type].operator.lbp;
 
     exp->type = NODE_BINARY_EXPR;
-    exp->binaryExpr.leftExp = left; //given left is left of binary exp
-    exp->binaryExpr.operator = op; //set operator to current operator
-    exp->binaryExpr.rightExp = parseExpression(p, rbp); //parse right of exp
+    exp->binary_expr.left_exp = left;                     //given left is left of binary exp
+    exp->binary_expr.operator = op;                      //set operator to current operator
+    exp->binary_expr.right_exp = parseExpression(p, rbp); //parse right of exp
 
     return exp; //return binary expression as new left
 }
 
-Node* ledBinaryRight(Parser *p, Node *left) //right assoc version
-{ //copying the exact same function with a single literal edit because i couldnt be bothered to generalize the binary function is a bit of a disgusting kludge and im sorry
-    Node *exp = malloc(sizeof(Node));
+//right assoc version
+//copying the exact same function with a single literal edit because i couldnt be bothered to generalize the binary function is a bit of a disgusting kludge and im sorry
+Node* ledBinaryRight(Parser* p, Node* left) {
+    Node* exp = malloc(sizeof(Node));
 
-    Token opToken = PREV(p);
-    OperatorType opType = lookupOperator(opToken);
-    Node *op = malloc(sizeof(Node));
+    Token op_token = PREV(p);
+    OperatorType op_type = lookupOperator(op_token);
+    Node* op = malloc(sizeof(Node));
 
     op->type = NODE_OPERATOR;
-    op->operator.opType = opType;
-    int rbp = rules[opType].operator.lbp - 1; 
+    op->operator.op_type = op_type;
+    int rbp = rules[op_type].operator.lbp - 1;
 
     exp->type = NODE_BINARY_EXPR;
-    exp->binaryExpr.leftExp = left; 
-    exp->binaryExpr.operator = op; 
-    exp->binaryExpr.rightExp = parseExpression(p, rbp);
+    exp->binary_expr.left_exp = left;
+    exp->binary_expr.operator = op;
+    exp->binary_expr.right_exp = parseExpression(p, rbp);
 
     return exp; //return binary expression as new left
 }
 
-Node* ledTernary(Parser *p, Node *left) //build ternary expression, ? was already skipped
-{
-    Node *exp = malloc(sizeof(Node));
+//build ternary expression, ? was already skipped
+Node* ledTernary(Parser* p, Node* left) {
+    Node* exp = malloc(sizeof(Node));
 
-    Token opToken = PREV(p);
-    OperatorType opType = lookupOperator(opToken);
-    Node *op = malloc(sizeof(Node));
+    Token op_token = PREV(p);
+    OperatorType op_type = lookupOperator(op_token);
+    Node* op = malloc(sizeof(Node));
 
     op->type = NODE_OPERATOR;
-    op->operator.opType = opType;
+    op->operator.op_type = op_type;
 
     exp->type = NODE_TERNARY_EXPR;
-    exp->ternaryExpr.operator = op;
-    exp->ternaryExpr.conditionExp = left;
-    exp->ternaryExpr.ifTrueExp = parseExpression(p, 0); //stops at :
+    exp->ternary_expr.operator = op;
+    exp->ternary_expr.condition_exp = left;
+    exp->ternary_expr.if_true_exp = parseExpression(p, 0); //stops at :
     consume(p, TOKEN_PUNCTUATION, ":", "Expected : in ternary expression");
-    exp->ternaryExpr.ifFalseExp = parseExpression(p, 29); //right assoc
+    exp->ternary_expr.if_false_exp = parseExpression(p, 29); //right assoc
 
     return exp;
 }
 
-Node* ledMember(Parser *p, Node *left) //build member access, . or -> was already skipped
-{
-    Node *exp = malloc(sizeof(Node));
+//build member access, . or -> was already skipped
+Node* ledMember(Parser* p, Node* left) {
+    Node* exp = malloc(sizeof(Node));
 
-    Token opToken = PREV(p);
-    bool isArrow = !strcmp(opToken.text, "->");
+    Token op_token = PREV(p);
+    bool is_arrow = !strcmp(op_token.text, "->");
     Token member = consume(p, TOKEN_IDENTIFIER, NULL, "Expected member name after . or ->");
 
     exp->type = NODE_MEMBER_EXPR;
-    exp->memberExpr.object = left;
-    exp->memberExpr.member = member.text;
-    exp->memberExpr.isArrow = isArrow;
+    exp->member_expr.object = left;
+    exp->member_expr.member = member.text;
+    exp->member_expr.is_arrow = is_arrow;
 
     return exp;
 }
 
-Node* ledIndex(Parser *p, Node *left) //build index expression, [ was already skipped
-{
-    Node *exp = malloc(sizeof(Node));
+//build index expression, [ was already skipped
+Node* ledIndex(Parser* p, Node* left) {
+    Node* exp = malloc(sizeof(Node));
 
     exp->type = NODE_INDEX_EXPR;
-    exp->indexExpr.target = left;
-    exp->indexExpr.index = parseExpression(p, 0);
+    exp->index_expr.target = left;
+    exp->index_expr.index = parseExpression(p, 0);
     consume(p, TOKEN_PUNCTUATION, "]", "Expected ] to close index expression");
 
     return exp;
 }
 
-Node *parseExpression(Parser *p, int rbp) //parses the actual stream of expression tokens
-{
+//parses the actual stream of expression tokens
+Node* parseExpression(Parser* p, int rbp) {
     Token tok = CUR(p);
-    OperatorType opType = lookupOperator(tok); // maps Token -> OperatorType
+    OperatorType op_type = lookupOperator(tok); // maps Token -> OperatorType
 
-    Node *left = NULL; //no allocation because pointer gets overriden
-    if (opType != OPERATOR_NONE && rules[opType].operator.nud != NULL) //consume operator
+    Node* left = NULL;                                                 //no allocation because pointer gets overriden
+    if (op_type != OPERATOR_NONE && rules[op_type].operator.nud != NULL) //consume operator
     {
         skip(p, "advancing past prefix/nud token");
-        left = rules[opType].operator.nud(p);
-    }
-    else if (IS_LITERAL(p)|| IS_IDENTIFIER(p)) //consume literal/variable
+        left = rules[op_type].operator.nud(p);
+    } else if (IS_LITERAL(p) || IS_IDENTIFIER(p)) //consume literal/variable
     {
-        left = nudPrimary(p); 
-    }
-    else //unexpected token error
+        left = nudPrimary(p);
+    } else //unexpected token error
     {
         parserError("Unexpected token '%s' at position %d, expected start of expression", tok.text, p->pos);
     }
 
-    while (1)
-    {
-        Token nextTok = CUR(p);
-        OperatorType nextOp = lookupOperator(nextTok); //peek next token
-        int lbp = (nextOp != OPERATOR_NONE) ? rules[nextOp].operator.lbp : 0; //lbp is 0 if next is identifier/literal
+    while (1) {
+        Token next_tok = CUR(p);
+        OperatorType next_op = lookupOperator(next_tok);                        //peek next token
+        int lbp = (next_op != OPERATOR_NONE) ? rules[next_op].operator.lbp : 0; //lbp is 0 if next is identifier/literal
 
-        if (lbp <= rbp) break;
+        if (lbp <= rbp)
+            break;
 
         skip(p, "advancing past infix/led token");
-        left = rules[nextOp].operator.led(p, left); //call led
+        left = rules[next_op].operator.led(p, left); //call led
     }
 
     return left;
 }
 
-Node *handleForeverStatement(Parser *p) 
-{
-    Node* foreverStmt = malloc(sizeof(Node));
-    foreverStmt->type = NODE_FOREVER_STMT;
+Node* handleForeverStatement(Parser* p) {
+    Node* forever_stmt = malloc(sizeof(Node));
+    forever_stmt->type = NODE_FOREVER_STMT;
     consume(p, TOKEN_KEYWORD, "forever", "expected forever statement");
-    foreverStmt->foreverLoop.logic = handleStatement(p);
-    return foreverStmt;
+    forever_stmt->forever_loop.logic = handleStatement(p);
+    return forever_stmt;
 }
 
-Node *handleSingleArgLoop(Parser *p) 
-{
-    Node* loopStmt = malloc(sizeof(Node));
-    if (IS_KEYWORD(p, "while"))          {loopStmt->type = NODE_WHILE_STMT;  consume(p, TOKEN_KEYWORD, "while", "expected while statement");}
-    else if (IS_KEYWORD(p, "until"))     {loopStmt->type = NODE_UNTIL_STMT;  consume(p, TOKEN_KEYWORD, "until", "expected until statement");}
-    else if (IS_KEYWORD(p, "repeat"))    {loopStmt->type = NODE_REPEAT_STMT; consume(p, TOKEN_KEYWORD, "repeat", "expected repeat statement");}
+Node* handleSingleArgLoop(Parser* p) {
+    Node* loop_stmt = malloc(sizeof(Node));
+    if (IS_KEYWORD(p, "while")) {
+        loop_stmt->type = NODE_WHILE_STMT;
+        consume(p, TOKEN_KEYWORD, "while", "expected while statement");
+    } else if (IS_KEYWORD(p, "until")) {
+        loop_stmt->type = NODE_UNTIL_STMT;
+        consume(p, TOKEN_KEYWORD, "until", "expected until statement");
+    } else if (IS_KEYWORD(p, "repeat")) {
+        loop_stmt->type = NODE_REPEAT_STMT;
+        consume(p, TOKEN_KEYWORD, "repeat", "expected repeat statement");
+    }
     consume(p, TOKEN_PUNCTUATION, "(", "Expected ( after loop keyword");
-    loopStmt->singleArgLoop.expr = parseExpression(p, 0);
+    loop_stmt->single_arg_loop.expr = parseExpression(p, 0);
     consume(p, TOKEN_PUNCTUATION, ")", "Expected ) after loop condition");
-    loopStmt->singleArgLoop.logic = handleStatement(p);
-    return loopStmt;
+    loop_stmt->single_arg_loop.logic = handleStatement(p);
+    return loop_stmt;
 }
 
-Node *handleIterateLoop(Parser *p)
-{
-    Node* iterStmt = malloc(sizeof(Node));
-    iterStmt->type = NODE_ITERATE_STMT;
+Node* handleIterateLoop(Parser* p) {
+    Node* iter_stmt = malloc(sizeof(Node));
+    iter_stmt->type = NODE_ITERATE_STMT;
     consume(p, TOKEN_KEYWORD, "iterate", "expected iterate statement");
     consume(p, TOKEN_PUNCTUATION, "(", "Expected ( after iterate");
-    iterStmt->iterateLoop.source = parseExpression(p, 0);
+    iter_stmt->iterate_loop.source = parseExpression(p, 0);
     consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after source expression");
-    iterStmt->iterateLoop.item = handleVarDecl(p);
+    iter_stmt->iterate_loop.item = handleVarDecl(p);
     consume(p, TOKEN_PUNCTUATION, ")", "Expected ) after loop condition");
-    iterStmt->iterateLoop.logic = handleStatement(p);
-    return iterStmt;
-
+    iter_stmt->iterate_loop.logic = handleStatement(p);
+    return iter_stmt;
 }
 
-Node *handleWhenStatement(Parser *p)
-{
+Node* handleWhenStatement(Parser* p) {
     Node* statement = malloc(sizeof(Node));
-    if (IS_KEYWORD(p, "when"))
-    {
+    if (IS_KEYWORD(p, "when")) {
         statement->type = NODE_WHEN_STMT;
         consume(p, TOKEN_KEYWORD, "when", "expected when statement");
         consume(p, TOKEN_PUNCTUATION, "(", "Expected ( after when"); //consume paren so ) fallthrough means it will stop on final ), leaving it as cur
-        statement->whenStmt.expr = parseExpression(p, 0);
+        statement->when_stmt.expr = parseExpression(p, 0);
         consume(p, TOKEN_PUNCTUATION, ")", "Expected ) after if condition");
-        statement->whenStmt.logic = handleStatement(p);
-        if(IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif")) statement->whenStmt.elseStmt = handleWhenStatement(p);
-        else statement->whenStmt.elseStmt = NULL;
-    }
-    else if (IS_KEYWORD(p, "else"))
-    {
+        statement->when_stmt.logic = handleStatement(p);
+        if (IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif"))
+            statement->when_stmt.else_stmt = handleWhenStatement(p);
+        else
+            statement->when_stmt.else_stmt = NULL;
+    } else if (IS_KEYWORD(p, "else")) {
         statement->type = NODE_ELSE_STMT;
         consume(p, TOKEN_KEYWORD, "else", "expected else statement");
-        statement->elseStmt.logic = handleStatement(p);
-    }
-    else if (IS_KEYWORD(p, "elif"))
-    {
+        statement->else_stmt.logic = handleStatement(p);
+    } else if (IS_KEYWORD(p, "elif")) {
         statement->type = NODE_ELSE_STMT;
         consume(p, TOKEN_KEYWORD, "elif", "expected elif statement");
-        Node* elifStmt = malloc(sizeof(Node)); 
-        elifStmt->type = NODE_WHEN_STMT; 
-        statement->elseStmt.logic = elifStmt; //wrap when statement in else statement
+        Node* elif_stmt = malloc(sizeof(Node));
+        elif_stmt->type = NODE_WHEN_STMT;
+        statement->else_stmt.logic = elif_stmt; //wrap when statement in else statement
         consume(p, TOKEN_PUNCTUATION, "(", "Expected ( after elif");
-        elifStmt->whenStmt.expr = parseExpression(p, 0);
+        elif_stmt->when_stmt.expr = parseExpression(p, 0);
         consume(p, TOKEN_PUNCTUATION, ")", "Expected ) after elif condition");
-        elifStmt->whenStmt.logic = handleStatement(p);
-        if(IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif")) elifStmt->whenStmt.elseStmt = handleWhenStatement(p);
-        else elifStmt->whenStmt.elseStmt = NULL;
+        elif_stmt->when_stmt.logic = handleStatement(p);
+        if (IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif"))
+            elif_stmt->when_stmt.else_stmt = handleWhenStatement(p);
+        else
+            elif_stmt->when_stmt.else_stmt = NULL;
     }
     return statement;
 }
 
-Node *handleIfStatement(Parser *p)
-{
+Node* handleIfStatement(Parser* p) {
     Node* statement = malloc(sizeof(Node));
-    if (IS_KEYWORD(p, "if"))
-    {
+    if (IS_KEYWORD(p, "if")) {
         statement->type = NODE_IF_STMT;
         consume(p, TOKEN_KEYWORD, "if", "expected if statement");
         consume(p, TOKEN_PUNCTUATION, "(", "Expected ( after if"); //consume paren so ) fallthrough means it will stop on final ), leaving it as cur
-        statement->ifStmt.expr = parseExpression(p, 0);
+        statement->if_stmt.expr = parseExpression(p, 0);
         consume(p, TOKEN_PUNCTUATION, ")", "Expected ) after if condition");
-        statement->ifStmt.logic = handleStatement(p);
-        if(IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif")) statement->ifStmt.elseStmt = handleIfStatement(p);
-        else statement->ifStmt.elseStmt = NULL;
-    }
-    else if (IS_KEYWORD(p, "else"))
-    {
+        statement->if_stmt.logic = handleStatement(p);
+        if (IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif"))
+            statement->if_stmt.else_stmt = handleIfStatement(p);
+        else
+            statement->if_stmt.else_stmt = NULL;
+    } else if (IS_KEYWORD(p, "else")) {
         statement->type = NODE_ELSE_STMT;
         consume(p, TOKEN_KEYWORD, "else", "expected else statement");
-        statement->elseStmt.logic = handleStatement(p);
-    }
-    else if (IS_KEYWORD(p, "elif")) //another terrible repetitive kludge because i am too lazy to refactor
+        statement->else_stmt.logic = handleStatement(p);
+    } else if (IS_KEYWORD(p, "elif")) //another terrible repetitive kludge because i am too lazy to refactor
     {
         statement->type = NODE_ELSE_STMT;
         consume(p, TOKEN_KEYWORD, "elif", "expected elif statement");
-        Node* elifStmt = malloc(sizeof(Node)); 
-        elifStmt->type = NODE_IF_STMT; 
-        statement->elseStmt.logic = elifStmt; //wrap if statement in else statement
+        Node* elif_stmt = malloc(sizeof(Node));
+        elif_stmt->type = NODE_IF_STMT;
+        statement->else_stmt.logic = elif_stmt; //wrap if statement in else statement
         consume(p, TOKEN_PUNCTUATION, "(", "Expected ( after elif");
-        elifStmt->ifStmt.expr = parseExpression(p, 0);
+        elif_stmt->if_stmt.expr = parseExpression(p, 0);
         consume(p, TOKEN_PUNCTUATION, ")", "Expected ) after elif condition");
-        elifStmt->ifStmt.logic = handleStatement(p);
-        if(IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif")) elifStmt->ifStmt.elseStmt = handleIfStatement(p);
-        else elifStmt->ifStmt.elseStmt = NULL;
+        elif_stmt->if_stmt.logic = handleStatement(p);
+        if (IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif"))
+            elif_stmt->if_stmt.else_stmt = handleIfStatement(p);
+        else
+            elif_stmt->if_stmt.else_stmt = NULL;
     }
     return statement;
 }
 
-Node *handleReturnStatement(Parser *p)
-{
+Node* handleReturnStatement(Parser* p) {
     consume(p, TOKEN_KEYWORD, "return", "Expected return statement!");
-    Node *stmt = malloc(sizeof(Node));
+    Node* stmt = malloc(sizeof(Node));
     stmt->type = NODE_RETURN_STMT;
-    stmt->returnStmt.expr = parseExpression(p, 0);
+    stmt->return_stmt.expr = parseExpression(p, 0);
     consume(p, TOKEN_PUNCTUATION, ";", "Expected ; to terminate statement!");
     return stmt;
 }
 
-Node *handleExpressionStatement(Parser *p)
-{
-    Node *expressionStatement = malloc(sizeof(Node));
-    expressionStatement->type = NODE_EXPR_STMT;
-    expressionStatement->exprStmt.expr = parseExpression(p, 0);
+Node* handleExpressionStatement(Parser* p) {
+    Node* expression_statement = malloc(sizeof(Node));
+    expression_statement->type = NODE_EXPR_STMT;
+    expression_statement->expr_stmt.expr = parseExpression(p, 0);
     consume(p, TOKEN_PUNCTUATION, ";", "Expected ; to terminate statement!");
-    return expressionStatement;
+    return expression_statement;
 }
 
-Node *handleStatement(Parser *p) //starts on whatever is after ; or }
-{
+//starts on whatever is after ; or }
+Node* handleStatement(Parser* p) {
     //logic for determining kind of statement will go here
     //STUB, not all statements implemented.
-    if (IS_OPEN_BRACE(p)) return handleCodeBlock(p);
-    if (IS_KEYWORD(p, "when")) return handleWhenStatement(p);
-    if (IS_KEYWORD(p, "if")) return handleIfStatement(p);
-    if (IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif")) parserError("Expected opening if statement to else or elif at position %d", p->pos);
-    if (IS_KEYWORD(p, "forever")) return handleForeverStatement(p);
-    if (IS_KEYWORD(p, "until") || IS_KEYWORD(p, "while") || IS_KEYWORD(p, "repeat")) return handleSingleArgLoop(p);
-    if (IS_KEYWORD(p, "iterate")) return handleIterateLoop(p);
-    if (IS_KEYWORD(p, "typedef")) return handleTypedef(p);
-    if (IS_KEYWORD(p, "object"))
-    {
-        Node *decl = handleObjectDecl(p, true);
+    if (IS_OPEN_BRACE(p))
+        return handleCodeBlock(p);
+    if (IS_KEYWORD(p, "when"))
+        return handleWhenStatement(p);
+    if (IS_KEYWORD(p, "if"))
+        return handleIfStatement(p);
+    if (IS_KEYWORD(p, "else") || IS_KEYWORD(p, "elif"))
+        parserError("Expected opening if statement to else or elif at position %d", p->pos);
+    if (IS_KEYWORD(p, "forever"))
+        return handleForeverStatement(p);
+    if (IS_KEYWORD(p, "until") || IS_KEYWORD(p, "while") || IS_KEYWORD(p, "repeat"))
+        return handleSingleArgLoop(p);
+    if (IS_KEYWORD(p, "iterate"))
+        return handleIterateLoop(p);
+    if (IS_KEYWORD(p, "typedef"))
+        return handleTypedef(p);
+    if (IS_KEYWORD(p, "object")) {
+        Node* decl = handleObjectDecl(p, true);
         consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after object declaration");
         return decl;
     }
-    if (isTypeName(p, &CUR(p)))
-    {
-        Node *decl = handleVarDecl(p);
+    if (isTypeName(p, &CUR(p))) {
+        Node* decl = handleVarDecl(p);
         consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after variable declaration");
         return decl;
     }
-    if (IS_KEYWORD(p, "return")) return handleReturnStatement(p);
+    if (IS_KEYWORD(p, "return"))
+        return handleReturnStatement(p);
     return handleExpressionStatement(p);
 }
 
-Node *handleCodeBlock(Parser *p) //starts on opening {, ends after closing }
-{
-    Node *block = malloc(sizeof(Node));
+//starts on opening {, ends after closing }
+Node* handleCodeBlock(Parser* p) {
+    Node* block = malloc(sizeof(Node));
     block->type = NODE_BLOCK;
 
-    int statementCap = 8;
-    Node **statements = malloc(sizeof(Node*) * statementCap);
-    int statementCount = 0;
+    int statement_cap = 8;
+    Node** statements = malloc(sizeof(Node*) * statement_cap);
+    int statement_count = 0;
 
     consume(p, TOKEN_PUNCTUATION, "{", "Expected opening { for code block");
 
-    while (!IS_CLOSE_BRACE(p))
-    {
-        if (p->pos >= p->tokenCount || CUR(p).type == TOKEN_EOF)
+    while (!IS_CLOSE_BRACE(p)) {
+        if (p->pos >= p->token_count || CUR(p).type == TOKEN_EOF)
             parserError("Expected } before end of file");
 
-        if (statementCount >= statementCap)
-        {
-            statementCap *= 2;
-            statements = realloc(statements, sizeof(Node*) * statementCap);
+        if (statement_count >= statement_cap) {
+            statement_cap *= 2;
+            statements = realloc(statements, sizeof(Node*) * statement_cap);
         }
-        statements[statementCount++] = handleStatement(p);
+        statements[statement_count++] = handleStatement(p);
     }
 
     consume(p, TOKEN_PUNCTUATION, "}", "Expected } at end of code block");
 
     block->block.statements = statements;
-    block->block.count = statementCount;
+    block->block.count = statement_count;
     return block;
 }
 
-char *handleImport(Parser *p)
-{
+char* handleImport(Parser* p) {
     consume(p, TOKEN_KEYWORD, "import", "Expected import");
-    Token nameTok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected import name");
+    Token name_tok = consume(p, TOKEN_IDENTIFIER, NULL, "Expected import name");
     consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after import name");
-    return nameTok.text;
+    return name_tok.text;
 }
 
-Node *handleGlobal(Parser *p)
-{
-    Node *global = handleVarDecl(p);
+Node* handleGlobal(Parser* p) {
+    Node* global = handleVarDecl(p);
     consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after global declaration");
     return global;
 }
 
-Node *handleFunction(Parser *p, Node *returnType) //starts on function name, return type already parsed
-{
-    Node *function = malloc(sizeof(Node));
+//starts on function name, return type already parsed
+Node* handleFunction(Parser* p, Node* return_type) {
+    Node* function = malloc(sizeof(Node));
     function->type = NODE_FUNCTION_DECL;
-    function->functionDecl.returnType = returnType;
-    function->functionDecl.name = CUR(p).text;
+    function->function_decl.return_type = return_type;
+    function->function_decl.name = CUR(p).text;
 
-    int paramCount;
-    Node **params = handleArgList(p, true, &paramCount);
-    function->functionDecl.paramCount = paramCount;
-    function->functionDecl.params = params;
+    int param_count;
+    Node** params = handleArgList(p, true, &param_count);
+    function->function_decl.param_count = param_count;
+    function->function_decl.params = params;
 
-    if (IS_OPEN_BRACE(p))
-    {
-        function->functionDecl.body = handleCodeBlock(p);
-    }
-    else
-    {
+    if (IS_OPEN_BRACE(p)) {
+        function->function_decl.body = handleCodeBlock(p);
+    } else {
         consume(p, TOKEN_PUNCTUATION, ";", "Expected { or ; after function declaration");
-        function->functionDecl.body = NULL;
+        function->function_decl.body = NULL;
     }
 
     return function;
 }
 
-Node *parse(Parser *p)
-{
-    int importCount = 0;
-    int functionCount = 0;
-    int globalCount = 0;
+Node* parse(Parser* p) {
+    int import_count = 0;
+    int function_count = 0;
+    int global_count = 0;
 
-    int importCap = 8, functionCap = 8, globalCap = 8;
-    char **imports = malloc(sizeof(char*) * importCap);
-    Node **functions = malloc(sizeof(Node*) * functionCap);
-    Node **globals = malloc(sizeof(Node*) * globalCap);
+    int import_cap = 8, function_cap = 8, global_cap = 8;
+    char** imports = malloc(sizeof(char*) * import_cap);
+    Node** functions = malloc(sizeof(Node*) * function_cap);
+    Node** globals = malloc(sizeof(Node*) * global_cap);
 
-    while (CUR(p).type != TOKEN_EOF)
-    {
-        if (IS_KEYWORD(p, "import"))
-        {
-            if (importCount >= importCap) { importCap *= 2; imports = realloc(imports, sizeof(char*) * importCap); }
-            imports[importCount++] = handleImport(p);
+    while (CUR(p).type != TOKEN_EOF) {
+        if (IS_KEYWORD(p, "import")) {
+            if (import_count >= import_cap) {
+                import_cap *= 2;
+                imports = realloc(imports, sizeof(char*) * import_cap);
+            }
+            imports[import_count++] = handleImport(p);
             continue;
         }
 
-        if (IS_KEYWORD(p, "typedef"))
-        {
-            if (globalCount >= globalCap) { globalCap *= 2; globals = realloc(globals, sizeof(Node*) * globalCap); }
-            globals[globalCount++] = handleTypedef(p);
+        if (IS_KEYWORD(p, "typedef")) {
+            if (global_count >= global_cap) {
+                global_cap *= 2;
+                globals = realloc(globals, sizeof(Node*) * global_cap);
+            }
+            globals[global_count++] = handleTypedef(p);
             continue;
         }
 
-        if (IS_KEYWORD(p, "object"))
-        {
-            Node *object = handleObjectDecl(p, true);
+        if (IS_KEYWORD(p, "object")) {
+            Node* object = handleObjectDecl(p, true);
             consume(p, TOKEN_PUNCTUATION, ";", "Expected ; after object declaration");
-            if (globalCount >= globalCap) { globalCap *= 2; globals = realloc(globals, sizeof(Node*) * globalCap); }
-            globals[globalCount++] = object;
+            if (global_count >= global_cap) {
+                global_cap *= 2;
+                globals = realloc(globals, sizeof(Node*) * global_cap);
+            }
+            globals[global_count++] = object;
             continue;
         }
 
         if (IS_IDENTIFIER(p) && NEXT_PUNCT(p, "(")) //untyped function, implicit void return
         {
-            if (functionCount >= functionCap) { functionCap *= 2; functions = realloc(functions, sizeof(Node*) * functionCap); }
-            functions[functionCount++] = handleFunction(p, makePrimitiveType(PRIMITIVE_VOID));
+            if (function_count >= function_cap) {
+                function_cap *= 2;
+                functions = realloc(functions, sizeof(Node*) * function_cap);
+            }
+            functions[function_count++] = handleFunction(p, makePrimitiveType(PRIMITIVE_VOID));
             continue;
         }
 
-        if (isTypeName(p, &CUR(p)))
-        {
+        if (isTypeName(p, &CUR(p))) {
             int start = p->pos;
-            Node *type = parseType(p);
+            Node* type = parseType(p);
 
-            if (IS_IDENTIFIER(p) && NEXT_PUNCT(p, "("))
-            {
-                if (functionCount >= functionCap) { functionCap *= 2; functions = realloc(functions, sizeof(Node*) * functionCap); }
-                functions[functionCount++] = handleFunction(p, type);
+            if (IS_IDENTIFIER(p) && NEXT_PUNCT(p, "(")) {
+                if (function_count >= function_cap) {
+                    function_cap *= 2;
+                    functions = realloc(functions, sizeof(Node*) * function_cap);
+                }
+                functions[function_count++] = handleFunction(p, type);
                 continue;
             }
 
             p->pos = start;
-            if (globalCount >= globalCap) { globalCap *= 2; globals = realloc(globals, sizeof(Node*) * globalCap); }
-            globals[globalCount++] = handleGlobal(p);
+            if (global_count >= global_cap) {
+                global_cap *= 2;
+                globals = realloc(globals, sizeof(Node*) * global_cap);
+            }
+            globals[global_count++] = handleGlobal(p);
             continue;
         }
 
         parserError("Unexpected token '%s' at top level, position %d", CUR(p).text, p->pos);
     }
 
-    Node *programNode = malloc(sizeof(Node));
-    *programNode = (Node) {
+    Node* program_node = malloc(sizeof(Node));
+    *program_node = (Node){
         .type = NODE_PROGRAM,
         .program = {
             .imports = imports,
-            .importCount = importCount,
+            .import_count = import_count,
             .functions = functions,
-            .functionCount = functionCount,
+            .function_count = function_count,
             .globals = globals,
-            .globalCount = globalCount,
-        }
-    };
-    return programNode;
+            .global_count = global_count,
+        }};
+    return program_node;
 }

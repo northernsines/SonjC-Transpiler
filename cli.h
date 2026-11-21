@@ -9,11 +9,11 @@ Defines command line option parsing for the transpiler driver.
 */
 
 typedef struct {
-    bool printTok;
-    bool printAst;
-    const char *filePath;
+    bool print_tok;
+    bool print_ast;
+    const char* file_path;
 } CliOptions;
 
-CliOptions parseArgs(int argc, char *argv[]);
+CliOptions parseArgs(int argc, char* argv[]);
 
 #endif

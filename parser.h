@@ -127,17 +127,17 @@ typedef enum {
 } PrimitiveType; //primitive, built in types
 
 typedef struct {
-    int bitWidth;
-    bool isSigned;
-    int fracBits;
+    int bit_width;
+    bool is_signed;
+    int frac_bits;
 } PrimitiveInfo;
 
 typedef struct {
-    Token *tokens;
-    int tokenCount;
+    Token* tokens;
+    int token_count;
     int pos;
-    char** defTypes;
-    int defTypeCount;
+    char** def_types;
+    int def_type_count;
 } Parser;
 
 typedef enum {
@@ -164,256 +164,254 @@ typedef enum {
     QUAL_FUNCTION,
 } QualifierKind;
 
-typedef struct Node{
+typedef struct Node {
     NodeType type;
 
     union {
         struct { // top level program
-            char **imports;
-            int importCount;
-            struct Node **functions;
-            int functionCount;
-            struct Node **globals;
-            int globalCount;
+            char** imports;
+            int import_count;
+            struct Node** functions;
+            int function_count;
+            struct Node** globals;
+            int global_count;
         } program;
 
         struct { // function declaration
-            struct Node *returnType;
-            char *name;
-            struct Node **params;
-            int paramCount;
-            struct Node *body; //NULL for prototype-only declarations
-        } functionDecl;
+            struct Node* return_type;
+            char* name;
+            struct Node** params;
+            int param_count;
+            struct Node* body; //NULL for prototype-only declarations
+        } function_decl;
 
         struct { // variable declaration
-            struct Node *type;
-            struct Node *var;
-            struct Node *valueExpr;
-        } varDecl;
+            struct Node* type;
+            struct Node* var;
+            struct Node* value_expr;
+        } var_decl;
 
         struct { // typedef aliasing
-            char *aliasName;
-            struct Node *underlyingInstance;
+            char* alias_name;
+            struct Node* underlying_instance;
 
-        } typeDecl;
+        } type_decl;
 
         struct { // object type/template declaration
-            char *name;
-            struct Node **members;
-            int memberCount;
-        } objectDecl;
+            char* name;
+            struct Node** members;
+            int member_count;
+        } object_decl;
 
         struct { // block
-            struct Node **statements;
+            struct Node** statements;
             int count;
         } block;
 
         struct { // expression statement
-            struct Node *expr;
-        } exprStmt;
+            struct Node* expr;
+        } expr_stmt;
 
         struct { //if statement
-            struct Node *expr;
-            struct Node *logic; //block OR statement direct
-            struct Node *elseStmt;
-        } ifStmt;
+            struct Node* expr;
+            struct Node* logic; //block OR statement direct
+            struct Node* else_stmt;
+        } if_stmt;
 
         struct { //when statement
-            struct Node *expr;
-            struct Node *logic;
-            struct Node *elseStmt;
-        } whenStmt;
+            struct Node* expr;
+            struct Node* logic;
+            struct Node* else_stmt;
+        } when_stmt;
 
         struct { // else statement
-            struct Node *logic;
-        } elseStmt;
+            struct Node* logic;
+        } else_stmt;
 
         struct {
-            struct Node *logic;
-        } foreverLoop; // forever loop, no args
+            struct Node* logic;
+        } forever_loop; // forever loop, no args
 
         struct {
-            struct Node *expr;
-            struct Node *logic;
-        } singleArgLoop; //while, until, repeat
+            struct Node* expr;
+            struct Node* logic;
+        } single_arg_loop; //while, until, repeat
 
         struct {
-            struct Node *source;
-            struct Node *item;
-            struct Node *logic;
-        } iterateLoop; //iterate loop
+            struct Node* source;
+            struct Node* item;
+            struct Node* logic;
+        } iterate_loop; //iterate loop
 
         struct {
-            struct Node *init;
-            struct Node *condition;
-            struct Node *update;
-            struct Node *logic;
-        } forLoop; //for loop
+            struct Node* init;
+            struct Node* condition;
+            struct Node* update;
+            struct Node* logic;
+        } for_loop; //for loop
 
         struct { // call expression
-            struct Node *callee;
-            struct Node **args;
-            int argCount;
-        } callExpr;
+            struct Node* callee;
+            struct Node** args;
+            int arg_count;
+        } call_expr;
 
         struct {
-            struct Node *expr;
-        } returnStmt;
+            struct Node* expr;
+        } return_stmt;
 
         struct { // member access (. or ->)
-            struct Node *object;
-            char *member;
-            bool isArrow;
-        } memberExpr;
+            struct Node* object;
+            char* member;
+            bool is_arrow;
+        } member_expr;
 
         struct { // index expression
-            struct Node *target;
-            struct Node *index;
-        } indexExpr;
+            struct Node* target;
+            struct Node* index;
+        } index_expr;
 
         struct { // variable reference
-            char *name;
+            char* name;
         } var;
 
         struct { // int literal
             int value;
-        } intLiteral;
+        } int_literal;
 
         struct { // float literal
             float value;
-        } floatLiteral;
+        } float_literal;
 
         struct { // fixed literal
             uint32_t value;
-        } fixedLiteral;
+        } fixed_literal;
 
         struct { // char literal
             char value;
-        } charLiteral;
+        } char_literal;
 
         struct { // string literal
             char* value;
-        } stringLiteral;
+        } string_literal;
 
         struct { // bool literal
             bool value;
-        } boolLiteral;
+        } bool_literal;
 
         struct { // operator
-            OperatorType opType;
+            OperatorType op_type;
             int lbp;
-            struct Node *(*nud)(Parser *p);
-            struct Node *(*led)(Parser *p, struct Node *left);
+            struct Node* (*nud)(Parser* p);
+            struct Node* (*led)(Parser* p, struct Node* left);
         } operator;
 
         struct { // unary expression
-            struct Node *operator;
-            struct Node *exp;
-        } unaryExpr;
+            struct Node* operator;
+            struct Node* exp;
+        } unary_expr;
 
         struct { // binary expression
-            struct Node *operator;
-            struct Node *leftExp;
-            struct Node *rightExp;
-        } binaryExpr;
+            struct Node* operator;
+            struct Node* left_exp;
+            struct Node* right_exp;
+        } binary_expr;
 
         struct { // ternary expression
-            struct Node *operator;
-            struct Node *conditionExp;
-            struct Node *ifTrueExp;
-            struct Node *ifFalseExp;
-        } ternaryExpr;
+            struct Node* operator;
+            struct Node* condition_exp;
+            struct Node* if_true_exp;
+            struct Node* if_false_exp;
+        } ternary_expr;
 
         struct {
-            struct Node *type;
-            struct Node *exp;
+            struct Node* type;
+            struct Node* exp;
         } cast;
 
         struct {
-            struct Node *innerType;
-            struct Node *qualifier;
-        } typeNode; //type specifier
+            struct Node* inner_type;
+            struct Node* qualifier;
+        } type_node; //type specifier
 
         struct {
             PrimitiveType type;
-        } primitiveType; //for primitive built-in types.
+        } primitive_type; //for primitive built-in types.
 
         struct {
             char* name;
-        } typeRef; //for references to user-defined types.
+        } type_ref; //for references to user-defined types.
 
         struct {
             QualifierKind kind;
             union {
-                SimpleQualifier simpleQual;
-                int arraySize;
+                SimpleQualifier simple_qual;
+                int array_size;
                 struct {
-                    struct Node **params;
-                    int paramCount;
-                }funcQual;
+                    struct Node** params;
+                    int param_count;
+                } func_qual;
             };
-        } typeQualifier;
+        } type_qualifier;
 
         //STUB add all nodes
     };
 } Node;
 
 // current-token shorthand
-#define PREV(p)              ((p)->tokens[(p)->pos-1])
-#define CUR(p)               ((p)->tokens[(p)->pos])
-#define NEXT(p)              ((p)->tokens[(p)->pos+1])
+#define PREV(p) ((p)->tokens[(p)->pos - 1])
+#define CUR(p) ((p)->tokens[(p)->pos])
+#define NEXT(p) ((p)->tokens[(p)->pos + 1])
 
 // common token-check macros
-#define IS_PUNCT(p, s)       (CUR(p).type == TOKEN_PUNCTUATION && !strcmp(CUR(p).text, (s)))
-#define IS_OP(p, s)          (CUR(p).type == TOKEN_OPERATOR && !strcmp(CUR(p).text, (s)))
-#define IS_KEYWORD(p, s)     (CUR(p).type == TOKEN_KEYWORD && !strcmp(CUR(p).text, (s)))
-#define IS_IDENTIFIER(p)     (CUR(p).type == TOKEN_IDENTIFIER)
-#define IS_LITERAL(p) ( \
+#define IS_PUNCT(p, s) (CUR(p).type == TOKEN_PUNCTUATION && !strcmp(CUR(p).text, (s)))
+#define IS_OP(p, s) (CUR(p).type == TOKEN_OPERATOR && !strcmp(CUR(p).text, (s)))
+#define IS_KEYWORD(p, s) (CUR(p).type == TOKEN_KEYWORD && !strcmp(CUR(p).text, (s)))
+#define IS_IDENTIFIER(p) (CUR(p).type == TOKEN_IDENTIFIER)
+#define IS_LITERAL(p) (             \
     CUR(p).type == TOKEN_INTEGER || \
-    CUR(p).type == TOKEN_STRING  || \
-    CUR(p).type == TOKEN_CHAR    || \
-    CUR(p).type == TOKEN_FLOAT   || \
-    CUR(p).type == TOKEN_FIXED   || \
-    (CUR(p).type == TOKEN_KEYWORD && (!strcmp(CUR(p).text, "true") || !strcmp(CUR(p).text, "false"))) \
-)
+    CUR(p).type == TOKEN_STRING ||  \
+    CUR(p).type == TOKEN_CHAR ||    \
+    CUR(p).type == TOKEN_FLOAT ||   \
+    CUR(p).type == TOKEN_FIXED ||   \
+    (CUR(p).type == TOKEN_KEYWORD && (!strcmp(CUR(p).text, "true") || !strcmp(CUR(p).text, "false"))))
 
-#define PREV_PUNCT(p, s)     (PREV(p).type == TOKEN_PUNCTUATION && !strcmp(PREV(p).text, (s)))
-#define PREV_KEYWORD(p, s)   (PREV(p).type == TOKEN_KEYWORD && !strcmp(PREV(p).text, (s)))
-#define PREV_IDENTIFIER(p)   (PREV(p).type == TOKEN_IDENTIFIER)
-#define PREV_LITERAL(p) ( \
+#define PREV_PUNCT(p, s) (PREV(p).type == TOKEN_PUNCTUATION && !strcmp(PREV(p).text, (s)))
+#define PREV_KEYWORD(p, s) (PREV(p).type == TOKEN_KEYWORD && !strcmp(PREV(p).text, (s)))
+#define PREV_IDENTIFIER(p) (PREV(p).type == TOKEN_IDENTIFIER)
+#define PREV_LITERAL(p) (            \
     PREV(p).type == TOKEN_INTEGER || \
-    PREV(p).type == TOKEN_STRING  || \
-    PREV(p).type == TOKEN_CHAR    || \
-    PREV(p).type == TOKEN_FLOAT   || \
-    PREV(p).type == TOKEN_FIXED   || \
-    (PREV(p).type == TOKEN_KEYWORD && (!strcmp(PREV(p).text, "true") || !strcmp(PREV(p).text, "false"))) \
-)
+    PREV(p).type == TOKEN_STRING ||  \
+    PREV(p).type == TOKEN_CHAR ||    \
+    PREV(p).type == TOKEN_FLOAT ||   \
+    PREV(p).type == TOKEN_FIXED ||   \
+    (PREV(p).type == TOKEN_KEYWORD && (!strcmp(PREV(p).text, "true") || !strcmp(PREV(p).text, "false"))))
 
-#define NEXT_PUNCT(p, s)     (NEXT(p).type == TOKEN_PUNCTUATION && !strcmp(NEXT(p).text, (s)))
-#define NEXT_KEYWORD(p, s)   (NEXT(p).type == TOKEN_KEYWORD && !strcmp(NEXT(p).text, (s)))
-#define NEXT_IDENTIFIER(p)   (NEXT(p).type == TOKEN_IDENTIFIER)
+#define NEXT_PUNCT(p, s) (NEXT(p).type == TOKEN_PUNCTUATION && !strcmp(NEXT(p).text, (s)))
+#define NEXT_KEYWORD(p, s) (NEXT(p).type == TOKEN_KEYWORD && !strcmp(NEXT(p).text, (s)))
+#define NEXT_IDENTIFIER(p) (NEXT(p).type == TOKEN_IDENTIFIER)
 
-#define IS_OPEN_PAREN(p)     IS_PUNCT(p, "(")
-#define IS_CLOSE_PAREN(p)    IS_PUNCT(p, ")")
-#define IS_OPEN_BRACE(p)     IS_PUNCT(p, "{")
-#define IS_CLOSE_BRACE(p)    IS_PUNCT(p, "}")
-#define IS_OPEN_BRACKET(p)   IS_PUNCT(p, "[")
-#define IS_CLOSE_BRACKET(p)  IS_PUNCT(p, "]")
-#define IS_COMMA(p)          IS_PUNCT(p, ",")
-#define IS_SEMICOLON(p)      IS_PUNCT(p, ";")
-#define IS_VOID_KW(p)        IS_KEYWORD(p, "void")
+#define IS_OPEN_PAREN(p) IS_PUNCT(p, "(")
+#define IS_CLOSE_PAREN(p) IS_PUNCT(p, ")")
+#define IS_OPEN_BRACE(p) IS_PUNCT(p, "{")
+#define IS_CLOSE_BRACE(p) IS_PUNCT(p, "}")
+#define IS_OPEN_BRACKET(p) IS_PUNCT(p, "[")
+#define IS_CLOSE_BRACKET(p) IS_PUNCT(p, "]")
+#define IS_COMMA(p) IS_PUNCT(p, ",")
+#define IS_SEMICOLON(p) IS_PUNCT(p, ";")
+#define IS_VOID_KW(p) IS_KEYWORD(p, "void")
 
 //necessary function declarations
-Node *parse(Parser *p);
+Node* parse(Parser* p);
 
 //utility functions (implemented in parser_utils.c)
-void parserError(const char *message, ...);
-bool primitiveFromToken(Token *t, PrimitiveType *out);
-const PrimitiveInfo *primitiveInfoFor(PrimitiveType type);
-bool isTypeName(Parser *p, Token *t);
-const char *tokenTypeName(TokenType t);
-Token consume(Parser *p, TokenType expectedType, const char *expectedText, const char *context);
-void skip(Parser *p, const char *context);
+void parserError(const char* message, ...);
+bool primitiveFromToken(Token* t, PrimitiveType* out);
+const PrimitiveInfo* primitiveInfoFor(PrimitiveType type);
+bool isTypeName(Parser* p, Token* t);
+const char* tokenTypeName(TokenType t);
+Token consume(Parser* p, TokenType expectedType, const char* expectedText, const char* context);
+void skip(Parser* p, const char* context);
 int pow10(int num);
 OperatorType lookupOperator(Token t);
 
@@ -422,16 +420,16 @@ extern Node rules[60];
 void initRules(void);
 
 //pratt parsing functions referenced by initRules (implemented in parser.c)
-Node* nudUnary(Parser *p);
-Node* nudSizeof(Parser *p);
-Node* nudCast(Parser *p);
-Node* nudParen(Parser *p);
-Node* nudAddress(Parser *p);
-Node* ledUnary(Parser *p, Node *left);
-Node* ledBinaryLeft(Parser *p, Node *left);
-Node* ledBinaryRight(Parser *p, Node *left);
-Node* ledCall(Parser *p, Node *left);
-Node* ledTernary(Parser *p, Node *left);
-Node* ledMember(Parser *p, Node *left);
-Node* ledIndex(Parser *p, Node *left);
+Node* nudUnary(Parser* p);
+Node* nudSizeof(Parser* p);
+Node* nudCast(Parser* p);
+Node* nudParen(Parser* p);
+Node* nudAddress(Parser* p);
+Node* ledUnary(Parser* p, Node* left);
+Node* ledBinaryLeft(Parser* p, Node* left);
+Node* ledBinaryRight(Parser* p, Node* left);
+Node* ledCall(Parser* p, Node* left);
+Node* ledTernary(Parser* p, Node* left);
+Node* ledMember(Parser* p, Node* left);
+Node* ledIndex(Parser* p, Node* left);
 #endif

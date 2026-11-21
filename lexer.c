@@ -1,7 +1,7 @@
-#include <stdio.h>    
-#include <stdlib.h>   
-#include <string.h> 
 #include "lexer.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 /*
 SonjC Lexer
@@ -9,41 +9,35 @@ Written Aug 2026
 Converts C source code into tokens to be used by the SonjC transpiler.
 */
 
-void advance(Lexer *lexer)
-{
+void advance(Lexer* lexer) {
     lexer->col++;
     lexer->pos++;
 }
 
-void retreat(Lexer *lexer)
-{
+void retreat(Lexer* lexer) {
     lexer->col--;
     lexer->pos--;
 }
 
-void newLine(Lexer *lexer)
-{
+void newLine(Lexer* lexer) {
     lexer->col = 0;
     lexer->line++;
 }
 
-Token returnEOF(Lexer* lexer)
-{
-    *lexer->currentText = '\0';
+Token returnEOF(Lexer* lexer) {
+    *lexer->current_text = '\0';
     return (Token){
         .length = 1,
-        .text = lexer->currentText,
-        .type = TOKEN_EOF
-    };
+        .text = lexer->current_text,
+        .type = TOKEN_EOF};
 }
 
-bool isNumber(char currentChar)
-{
+bool isNumber(char currentChar) {
     return ('0' <= currentChar && currentChar <= '9');
 }
 
-bool isKeyword(char *text) //STUB add all keywords
-{
+//STUB add all keywords
+bool isKeyword(char* text) {
     return
         // standard C types/qualifiers
         !strcmp(text, "int") ||
@@ -101,28 +95,27 @@ bool isKeyword(char *text) //STUB add all keywords
         !strcmp(text, "private");
 }
 
-bool isOperator (char currentChar) //STUB add all operators
-{
-    return
-        currentChar == '+' ||
-        currentChar == '-' ||
-        currentChar == '=' ||
-        currentChar == '*' ||
-        currentChar == '/' ||
-        currentChar == '%' ||
-        currentChar == '&' ||
-        currentChar == '|' ||
-        currentChar == '^' ||
-        currentChar == '!' ||
-        currentChar == '~' ||
-        currentChar == '<' ||
-        currentChar == '>' ||
-        currentChar == '?' ||
-        currentChar == '.';
+//STUB add all operators
+bool isOperator(char currentChar) {
+    return currentChar == '+' ||
+           currentChar == '-' ||
+           currentChar == '=' ||
+           currentChar == '*' ||
+           currentChar == '/' ||
+           currentChar == '%' ||
+           currentChar == '&' ||
+           currentChar == '|' ||
+           currentChar == '^' ||
+           currentChar == '!' ||
+           currentChar == '~' ||
+           currentChar == '<' ||
+           currentChar == '>' ||
+           currentChar == '?' ||
+           currentChar == '.';
 }
 
-bool isMulticharOperator(char *text) //STUB add all multichar operators
-{
+//STUB add all multichar operators
+bool isMulticharOperator(char* text) {
     return
         // three-char
         !strcmp(text, "<<=") ||
@@ -150,74 +143,66 @@ bool isMulticharOperator(char *text) //STUB add all multichar operators
         !strcmp(text, "|=");
 }
 
-bool isPunctuation (char currentChar) //STUB add all list of punctuation
-{
-    return
-        currentChar == '{' ||
-        currentChar == '}' ||
-        currentChar == '(' ||
-        currentChar == ')' ||
-        currentChar == '[' ||
-        currentChar == ']' ||
-        currentChar == ':' ||
-        currentChar == ';' ||
-        currentChar == ' ' ||
-        currentChar == '\n' ||
-        currentChar == ',';
+//STUB add all list of punctuation
+bool isPunctuation(char currentChar) {
+    return currentChar == '{' ||
+           currentChar == '}' ||
+           currentChar == '(' ||
+           currentChar == ')' ||
+           currentChar == '[' ||
+           currentChar == ']' ||
+           currentChar == ':' ||
+           currentChar == ';' ||
+           currentChar == ' ' ||
+           currentChar == '\n' ||
+           currentChar == ',';
 }
 
-void failIfOver (int size, Lexer *lexer)
-{
-    if (size >= 299)
-    {
-        fprintf(stderr, "too long of identifier!, line: %d, col %d\n", lexer->line, lexer->col); 
+void failIfOver(int size, Lexer* lexer) {
+    if (size >= 299) {
+        fprintf(stderr, "too long of identifier!, line: %d, col %d\n", lexer->line, lexer->col);
         exit(EXIT_FAILURE);
-    }
-    else return;
+    } else
+        return;
 }
 
-void skipNewline(Lexer *lexer)
-{
+void skipNewline(Lexer* lexer) {
     newLine(lexer);
     advance(lexer);
 }
 
-int skipComment(Lexer *lexer)
-{
-    char currentChar = lexer->source[lexer->pos];
+int skipComment(Lexer* lexer) {
+    char current_char = lexer->source[lexer->pos];
 
-    if (currentChar != '/') return 0;
-    if(currentChar == '\0') return 2;
+    if (current_char != '/')
+        return 0;
+    if (current_char == '\0')
+        return 2;
 
     advance(lexer);
-    currentChar = lexer->source[lexer->pos];
+    current_char = lexer->source[lexer->pos];
 
-    if (currentChar == '/')
-    {
-        while(currentChar != '\n')
-        {
-            if(currentChar == '\0') return 2;
-            currentChar = lexer->source[lexer->pos];
+    if (current_char == '/') {
+        while (current_char != '\n') {
+            if (current_char == '\0')
+                return 2;
+            current_char = lexer->source[lexer->pos];
         }
 
         newLine(lexer);
         return 1;
-    }
-    else if (currentChar == '*')
-    {
-        while (1)
-        {
-            currentChar = lexer->source[lexer->pos];
+    } else if (current_char == '*') {
+        while (1) {
+            current_char = lexer->source[lexer->pos];
 
-            if (currentChar == '\0')
+            if (current_char == '\0')
                 return 2;
 
-            if (currentChar == '\n')
+            if (current_char == '\n')
                 newLine(lexer);
 
-            if (currentChar == '*' &&
-                lexer->source[lexer->pos + 1] == '/')
-            {
+            if (current_char == '*' &&
+                lexer->source[lexer->pos + 1] == '/') {
                 advance(lexer); // consume '*'
                 advance(lexer); // consume '/'
                 return 1;
@@ -225,305 +210,283 @@ int skipComment(Lexer *lexer)
 
             advance(lexer);
         }
-    }
-    else
-    {
+    } else {
         retreat(lexer);
         return 0;
     }
 }
 
-Token handleCharLiteral(Lexer *lexer, int *currentSize)
-{
-    char currentChar = lexer->source[lexer->pos];
+Token handleCharLiteral(Lexer* lexer, int* currentSize) {
+    char current_char = lexer->source[lexer->pos];
 
-    if(lexer->charMode == true && lexer->charFilled == true &&
-       currentChar != '\'' && currentChar != '\\') //if filled 1 char (lexer->charFilled) but next char is not ' or \ and still in lexer->charMode, error.
+    if (lexer->char_mode == true && lexer->char_filled == true &&
+        current_char != '\'' && current_char != '\\') //if filled 1 char (lexer->char_filled) but next char is not ' or \ and still in lexer->char_mode, error.
     {
         fprintf(stderr, "char literal takes too many args, line: %d, col %d\n",
                 lexer->line, lexer->col);
         exit(EXIT_FAILURE);
     }
 
-    if(lexer->charMode == true && lexer->charFilled == false) //handle char itself
+    if (lexer->char_mode == true && lexer->char_filled == false) //handle char itself
     {
-        if(currentChar == '\0') return returnEOF(lexer);
-        if(currentChar == '\\') //if \, keep as raw text, grab next char too
+        if (current_char == '\0')
+            return returnEOF(lexer);
+        if (current_char == '\\') //if \, keep as raw text, grab next char too
         {
-            lexer->currentText[*currentSize] = currentChar;
+            lexer->current_text[*currentSize] = current_char;
             (*currentSize)++;
-            if(currentChar == '\0') return returnEOF(lexer);
+            if (current_char == '\0')
+                return returnEOF(lexer);
             advance(lexer);
-            currentChar = lexer->source[lexer->pos];
+            current_char = lexer->source[lexer->pos];
         }
 
-        lexer->currentText[*currentSize] = currentChar;
+        lexer->current_text[*currentSize] = current_char;
         (*currentSize)++;
-        if(currentChar == '\0') return returnEOF(lexer);
-        lexer->charFilled = true;
+        if (current_char == '\0')
+            return returnEOF(lexer);
+        lexer->char_filled = true;
         advance(lexer);
 
         return (Token){
             .length = *currentSize,
-            .text = lexer->currentText,
-            .type = TOKEN_CHAR
-        };
+            .text = lexer->current_text,
+            .type = TOKEN_CHAR};
     }
 
     return (Token){0};
 }
 
-bool handleQuotes(Lexer *lexer, TokenType *currentType)
-{
-    char currentChar = lexer->source[lexer->pos];
+bool handleQuotes(Lexer* lexer, TokenType* currentType) {
+    char current_char = lexer->source[lexer->pos];
     *currentType = TOKEN_STRING;
 
-    if(currentChar == '\'') //handle single quotes themselves
+    if (current_char == '\'') //handle single quotes themselves
     {
-        if(lexer->charMode == false) lexer->charMode = true;
-        else
-        {
-            lexer->charMode = false;
-            lexer->charFilled = false;
+        if (lexer->char_mode == false)
+            lexer->char_mode = true;
+        else {
+            lexer->char_mode = false;
+            lexer->char_filled = false;
         }
-        return true;     // signals "a quote was consumed, caller should re-lex"
+        return true; // signals "a quote was consumed, caller should re-lex"
     }
 
-    if(currentChar == '"') //handle double quotes themselves
+    if (current_char == '"') //handle double quotes themselves
     {
-        if(lexer->stringMode == false) lexer->stringMode = true;
-        else lexer->stringMode = false;
+        if (lexer->string_mode == false)
+            lexer->string_mode = true;
+        else
+            lexer->string_mode = false;
         return true;
     }
 
     return false;
 }
 
-Token handleString(Lexer *lexer, int *currentSize)
-{
-    char currentChar = lexer->source[lexer->pos];
+Token handleString(Lexer* lexer, int* currentSize) {
+    char current_char = lexer->source[lexer->pos];
 
-    if(lexer->stringMode)
-    {
-        while(currentChar != '"')
-        {
-            if(currentChar == '\0') return returnEOF(lexer);
-            if(currentChar == '\\')
-            {
-                lexer->currentText[*currentSize] = currentChar;
+    if (lexer->string_mode) {
+        while (current_char != '"') {
+            if (current_char == '\0')
+                return returnEOF(lexer);
+            if (current_char == '\\') {
+                lexer->current_text[*currentSize] = current_char;
                 (*currentSize)++;
                 advance(lexer);
-                currentChar = lexer->source[lexer->pos];
+                current_char = lexer->source[lexer->pos];
             }
 
-            lexer->currentText[*currentSize] = currentChar;
+            lexer->current_text[*currentSize] = current_char;
             (*currentSize)++;
             failIfOver(*currentSize, lexer);
             advance(lexer);
-            currentChar = lexer->source[lexer->pos];
+            current_char = lexer->source[lexer->pos];
         }
 
-        lexer->currentText[*currentSize] = '\0';
-        lexer->stringMode = false; // closing quote found, exit string mode
+        lexer->current_text[*currentSize] = '\0';
+        lexer->string_mode = false; // closing quote found, exit string mode
 
         return (Token){
             .length = *currentSize,
-            .text = lexer->currentText,
-            .type = TOKEN_STRING
-        };
+            .text = lexer->current_text,
+            .type = TOKEN_STRING};
     }
 
     return (Token){0};
 }
 
-Token readNumber(Lexer *lexer, int *currentSize)
-{
-    char currentChar = lexer->source[lexer->pos];
-    bool seenDot = false;
-    bool seenF = false;
+Token readNumber(Lexer* lexer, int* currentSize) {
+    char current_char = lexer->source[lexer->pos];
+    bool seen_dot = false;
+    bool seen_f = false;
 
-    while((currentChar >= '0' && currentChar <= '9') || (currentChar == '.' && seenDot == false) || (currentChar >= 'f' && seenF == false)) //digit and single decimal is allowed, as well as f for fixed marker.
+    while ((current_char >= '0' && current_char <= '9') || (current_char == '.' && seen_dot == false) || (current_char >= 'f' && seen_f == false)) //digit and single decimal is allowed, as well as f for fixed marker.
     {
-        lexer->currentText[*currentSize] = currentChar;
+        lexer->current_text[*currentSize] = current_char;
         (*currentSize)++;
         failIfOver(*currentSize, lexer);
-        if(currentChar == '.') seenDot = true;
-        if(currentChar == 'f') seenF = true;
+        if (current_char == '.')
+            seen_dot = true;
+        if (current_char == 'f')
+            seen_f = true;
         advance(lexer); //next pos
-        currentChar = lexer->source[lexer->pos];
+        current_char = lexer->source[lexer->pos];
     }
 
-    TokenType numberType = TOKEN_INTEGER; //int by default
-    if (seenDot) numberType = TOKEN_FLOAT; //float by default if point detected
-    if (seenF) numberType = TOKEN_FIXED; //fixed if fixed specifier detected
-    lexer->currentText[*currentSize] = '\0';
-    
-    return(Token) {
+    TokenType number_type = TOKEN_INTEGER; //int by default
+    if (seen_dot)
+        number_type = TOKEN_FLOAT; //float by default if point detected
+    if (seen_f)
+        number_type = TOKEN_FIXED; //fixed if fixed specifier detected
+    lexer->current_text[*currentSize] = '\0';
+
+    return (Token){
         .length = *currentSize,
-        .text = lexer->currentText,
-        .type = numberType
-    };
+        .text = lexer->current_text,
+        .type = number_type};
 }
 
-void readOperator(Lexer *lexer, int *currentSize)
-{
-    char currentChar = lexer->source[lexer->pos];
+void readOperator(Lexer* lexer, int* currentSize) {
+    char current_char = lexer->source[lexer->pos];
 
     advance(lexer); //next pos
-    currentChar = lexer->source[lexer->pos];
+    current_char = lexer->source[lexer->pos];
 
-    if(isOperator(currentChar))
-    {
+    if (isOperator(current_char)) {
         advance(lexer); //next pos
-        lexer->currentText[1] = currentChar;
-        currentChar = lexer->source[lexer->pos];
+        lexer->current_text[1] = current_char;
+        current_char = lexer->source[lexer->pos];
         (*currentSize)++;
 
-        if(isOperator(currentChar))
-        {
-            lexer->currentText[2] = currentChar;
-            lexer->currentText[3] = '\0';
+        if (isOperator(current_char)) {
+            lexer->current_text[2] = current_char;
+            lexer->current_text[3] = '\0';
 
-            if(!isMulticharOperator(lexer->currentText))
-            {
-                lexer->currentText[2] = '\0';
+            if (!isMulticharOperator(lexer->current_text)) {
+                lexer->current_text[2] = '\0';
 
-                if(isMulticharOperator(lexer->currentText))
-                {
+                if (isMulticharOperator(lexer->current_text)) {
                     retreat(lexer);
-                }
-                else
-                {
-                    lexer->currentText[1] = '\0';
+                } else {
+                    lexer->current_text[1] = '\0';
                     *currentSize = 1;
                     retreat(lexer);
                     retreat(lexer);
                 }
-            }
-            else
-            {
+            } else {
                 (*currentSize)++;
             }
-        }
-        else
-        {
+        } else {
             retreat(lexer);
-            lexer->currentText[2] = '\0';
+            lexer->current_text[2] = '\0';
 
-            if(!isMulticharOperator(lexer->currentText))
-            {
-                lexer->currentText[1] = '\0';
+            if (!isMulticharOperator(lexer->current_text)) {
+                lexer->current_text[1] = '\0';
                 (*currentSize)--;
                 retreat(lexer);
             }
         }
-    }
-    else
-    {
+    } else {
         retreat(lexer);
     }
 }
 
-Token handlePunctuationOperatorNumber(Lexer *lexer, int *currentSize, TokenType *currentType)
-{
-    char currentChar = lexer->source[lexer->pos];
+Token handlePunctuationOperatorNumber(Lexer* lexer, int* currentSize, TokenType* currentType) {
+    char current_char = lexer->source[lexer->pos];
 
-    if(isPunctuation(currentChar) ||
-       isOperator(currentChar) ||
-       isNumber(currentChar))
-    {
-        if(isPunctuation(currentChar)) *currentType = TOKEN_PUNCTUATION;
-        else if(isOperator(currentChar))
-        {
+    if (isPunctuation(current_char) ||
+        isOperator(current_char) ||
+        isNumber(current_char)) {
+        if (isPunctuation(current_char))
+            *currentType = TOKEN_PUNCTUATION;
+        else if (isOperator(current_char)) {
             *currentType = TOKEN_OPERATOR;
         }
-        if(currentChar == '\n') newLine(lexer); //new line if newline
+        if (current_char == '\n')
+            newLine(lexer); //new line if newline
 
-        lexer->currentText[0] = currentChar;
+        lexer->current_text[0] = current_char;
         (*currentSize)++;
 
-        if(isOperator(currentChar)) //check multichar operator
+        if (isOperator(current_char)) //check multichar operator
         {
             readOperator(lexer, currentSize);
         }
-        if(isNumber(currentChar)) //load multichar Number
+        if (isNumber(current_char)) //load multichar Number
         {
             advance(lexer);
             return readNumber(lexer, currentSize);
         }
 
-        lexer->currentText[*currentSize] = '\0'; //null terminate
+        lexer->current_text[*currentSize] = '\0'; //null terminate
         return (Token){
             .length = *currentSize,
-            .text = lexer->currentText,
-            .type = *currentType
-        };
+            .text = lexer->current_text,
+            .type = *currentType};
     }
 
     return (Token){0};
 }
 
-Token handleIdentifier(Lexer *lexer, int *currentSize, TokenType *currentType)
-{
-    char currentChar = lexer->source[lexer->pos];
+Token handleIdentifier(Lexer* lexer, int* currentSize, TokenType* currentType) {
+    char current_char = lexer->source[lexer->pos];
 
-    if(!isPunctuation(currentChar) &&
-       !isOperator(currentChar) &&
-       currentChar != '\'' &&
-       currentChar != '"')
-    {
-        while(!isPunctuation(currentChar) &&
-              !isOperator(currentChar) &&
-              currentChar != '\'' &&
-              currentChar != '"')
-        {
-            lexer->currentText[*currentSize] = currentChar;
+    if (!isPunctuation(current_char) &&
+        !isOperator(current_char) &&
+        current_char != '\'' &&
+        current_char != '"') {
+        while (!isPunctuation(current_char) &&
+               !isOperator(current_char) &&
+               current_char != '\'' &&
+               current_char != '"') {
+            lexer->current_text[*currentSize] = current_char;
             (*currentSize)++;
             failIfOver(*currentSize, lexer);
             advance(lexer); //next pos
-            currentChar = lexer->source[lexer->pos];
+            current_char = lexer->source[lexer->pos];
         }
 
-        lexer->currentText[*currentSize] = '\0'; //add null terminator so strmcp works
-        retreat(lexer); //back 1 position to set up next char as ending punct
+        lexer->current_text[*currentSize] = '\0'; //add null terminator so strmcp works
+        retreat(lexer);                          //back 1 position to set up next char as ending punct
 
-        if(isKeyword(lexer->currentText)) *currentType = TOKEN_KEYWORD;
-        else *currentType = TOKEN_IDENTIFIER;
+        if (isKeyword(lexer->current_text))
+            *currentType = TOKEN_KEYWORD;
+        else
+            *currentType = TOKEN_IDENTIFIER;
 
         return (Token){
             .length = *currentSize,
-            .text = lexer->currentText,
-            .type = *currentType
-        };
+            .text = lexer->current_text,
+            .type = *currentType};
     }
 
     return (Token){0};
 }
 
-Token nextToken(Lexer *lexer)
-{
-    int currentSize = 0;
-    TokenType currentType;
-    char currentChar = lexer->source[lexer->pos];
+Token nextToken(Lexer* lexer) {
+    int current_size = 0;
+    TokenType current_type;
+    char current_char = lexer->source[lexer->pos];
 
     //end of file
-    if(currentChar == '\0') return returnEOF(lexer);
+    if (current_char == '\0')
+        return returnEOF(lexer);
 
     //handle char literal content
-    if(lexer->charMode == true && lexer->charFilled == false)
-    {
+    if (lexer->char_mode == true && lexer->char_filled == false) {
         Token tok = handleCharLiteral(
             lexer,
-            &currentSize
-        );
+            &current_size);
 
-        if(tok.type == TOKEN_CHAR)
+        if (tok.type == TOKEN_CHAR)
             return tok;
     }
 
     //handle char literal errors
-    if(lexer->charMode == true && lexer->charFilled == true &&
-       currentChar != '\'' && currentChar != '\\') //if filled 1 char (lexer->charFilled) but next char is not ' or \ and still in lexer->charMode, error.
+    if (lexer->char_mode == true && lexer->char_filled == true &&
+        current_char != '\'' && current_char != '\\') //if filled 1 char (lexer->char_filled) but next char is not ' or \ and still in lexer->char_mode, error.
     {
         fprintf(stderr, "char literal takes too many args, line: %d, col: %d\n",
                 lexer->line, lexer->col);
@@ -531,19 +494,16 @@ Token nextToken(Lexer *lexer)
     }
 
     //handle quotes
-    if(handleQuotes(lexer, &currentType))
-    {
+    if (handleQuotes(lexer, &current_type)) {
         advance(lexer);
         return nextToken(lexer);
     }
 
     //handle string literals
-    if(lexer->stringMode)
-    {
-        Token tok = handleString(lexer, &currentSize);
+    if (lexer->string_mode) {
+        Token tok = handleString(lexer, &current_size);
 
-        if(tok.type == TOKEN_STRING)
-        {
+        if (tok.type == TOKEN_STRING) {
             advance(lexer);
             return tok;
         }
@@ -551,17 +511,13 @@ Token nextToken(Lexer *lexer)
     //handle preprocessor directives
 
     //skip comments
-    int commentResult = skipComment(lexer);
-    if(commentResult == 1)
-    {
+    int comment_result = skipComment(lexer);
+    if (comment_result == 1) {
         return (Token){
             .length = 1,
             .text = "\n",
-            .type = TOKEN_PUNCTUATION
-        };
-    }
-    else if(commentResult == 2)
-    {
+            .type = TOKEN_PUNCTUATION};
+    } else if (comment_result == 2) {
         return returnEOF(lexer);
     }
 
@@ -569,17 +525,15 @@ Token nextToken(Lexer *lexer)
     {
         Token tok = handlePunctuationOperatorNumber(
             lexer,
-            &currentSize,
-            &currentType
-        );
+            &current_size,
+            &current_type);
 
-        if(tok.type == TOKEN_PUNCTUATION ||
-           tok.type == TOKEN_OPERATOR)
-        {
+        if (tok.type == TOKEN_PUNCTUATION ||
+            tok.type == TOKEN_OPERATOR) {
             advance(lexer);
             return tok;
         }
-        if(tok.type == TOKEN_INTEGER || tok.type == TOKEN_FLOAT || tok.type == TOKEN_FIXED) //dont advance for number, it does that on its own.
+        if (tok.type == TOKEN_INTEGER || tok.type == TOKEN_FLOAT || tok.type == TOKEN_FIXED) //dont advance for number, it does that on its own.
         {
             return tok;
         }
@@ -589,13 +543,11 @@ Token nextToken(Lexer *lexer)
     {
         Token tok = handleIdentifier(
             lexer,
-            &currentSize,
-            &currentType
-        );
+            &current_size,
+            &current_type);
 
-        if(tok.type == TOKEN_KEYWORD ||
-           tok.type == TOKEN_IDENTIFIER)
-        {
+        if (tok.type == TOKEN_KEYWORD ||
+            tok.type == TOKEN_IDENTIFIER) {
             advance(lexer);
             return tok;
         }
@@ -603,8 +555,7 @@ Token nextToken(Lexer *lexer)
 
     advance(lexer);
     return (Token){
-        .length = currentSize,
-        .text = lexer->currentText,
-        .type = currentType
-    };
+        .length = current_size,
+        .text = lexer->current_text,
+        .type = current_type};
 }

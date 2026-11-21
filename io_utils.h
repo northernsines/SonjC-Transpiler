@@ -7,6 +7,6 @@ Written Sep 2026
 Declares file I/O helpers.
 */
 
-char *read_file(const char *path);
+char* readFile(const char* path);
 
 #endif

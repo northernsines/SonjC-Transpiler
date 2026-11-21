@@ -1,0 +1,37 @@
+[
+  {
+    "directory": "/home/sonjahw/Projects/SonjC_Transpiler",
+    "command": "clang -I. -c cli.c -o /dev/null",
+    "file": "cli.c"
+  },
+  {
+    "directory": "/home/sonjahw/Projects/SonjC_Transpiler",
+    "command": "clang -I. -c io_utils.c -o /dev/null",
+    "file": "io_utils.c"
+  },
+  {
+    "directory": "/home/sonjahw/Projects/SonjC_Transpiler",
+    "command": "clang -I. -c lexer.c -o /dev/null",
+    "file": "lexer.c"
+  },
+  {
+    "directory": "/home/sonjahw/Projects/SonjC_Transpiler",
+    "command": "clang -I. -c main.c -o /dev/null",
+    "file": "main.c"
+  },
+  {
+    "directory": "/home/sonjahw/Projects/SonjC_Transpiler",
+    "command": "clang -I. -c parser.c -o /dev/null",
+    "file": "parser.c"
+  },
+  {
+    "directory": "/home/sonjahw/Projects/SonjC_Transpiler",
+    "command": "clang -I. -c parser_utils.c -o /dev/null",
+    "file": "parser_utils.c"
+  },
+  {
+    "directory": "/home/sonjahw/Projects/SonjC_Transpiler",
+    "command": "clang -I. -c print.c -o /dev/null",
+    "file": "print.c"
+  }
+]
